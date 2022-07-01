@@ -1,0 +1,20 @@
+{
+  "visual": {
+    "name": "Speckle PowerBI Viewer",
+    "displayName": "Speckle PowerBI Viewer",
+    "guid": "powerbiSpeckleVisualAA98F06515D847E8ACB33BAB487244E0",
+    "visualClassName": "Visual",
+    "version": "1.0.0",
+    "description": "An interactive 3D viewer for Speckle Data",
+    "supportUrl": "https://speckle.community",
+    "gitHubUrl": "https://"
+  },
+  "apiVersion": "3.8.0",
+  "author": { "name": "", "email": "" },
+  "assets": { "icon": "assets/icon.png" },
+  "externalJS": null,
+  "style": "style/visual.less",
+  "capabilities": "capabilities.json",
+  "dependencies": null,
+  "stringResources": []
+}

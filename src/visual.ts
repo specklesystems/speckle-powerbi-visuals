@@ -1,28 +1,3 @@
-/*
- *  Power BI Visual CLI
- *
- *  Copyright (c) Microsoft Corporation
- *  All rights reserved.
- *  MIT License
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the ""Software""), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
- *  furnished to do so, subject to the following conditions:
- *
- *  The above copyright notice and this permission notice shall be included in
- *  all copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- *  THE SOFTWARE.
- */
 "use strict"
 
 import "core-js/stable"
@@ -60,44 +35,7 @@ export class Visual implements IVisual {
 
     this.target = options.element
     if (document) {
-      var container = this.target.appendChild(document.createElement("div"))
-      container.style.backgroundColor = "transparent"
-      container.style.height = "100%"
-      container.style.width = "100%"
-      container.style.position = "fixed"
-      const params = DefaultViewerParams
-      params.showStats = true
-
-      const viewer = new Viewer(container, params)
-      viewer.init().then(() => {
-        viewer.onWindowResize()
-
-        viewer.on(
-          "load-progress",
-          (a: { progress: number; id: string; url: string }) => {
-            this.loadedUrls[a.url] = a.progress
-            if (a.progress >= 1) {
-              viewer.onWindowResize()
-            }
-          }
-        )
-
-        viewer.on("load-complete", () => {
-          //console.log("Load complete")
-        })
-
-        viewer.on("select", o => {
-          //console.log("selection-changed", o)
-          if (o.userData.length == 0) {
-            return
-          }
-          //var ids = o.userData.map(data => this.objectToSelectionId[data.id][0])
-          //console.log("selection ids", ids, this.objectToSelectionId)
-          //this.selectionManager.select(ids)
-        })
-
-        this.viewer = viewer
-      })
+      this.initViewer()
     }
   }
   public initViewer() {
@@ -106,10 +44,13 @@ export class Visual implements IVisual {
     container.style.height = "100%"
     container.style.width = "100%"
     container.style.position = "fixed"
+
     const params = DefaultViewerParams
-    params.showStats = true
+    // Uncomment the line below to show stats
+    //params.showStats = true
 
     const viewer = new Viewer(container, params)
+
     viewer.init().then(() => {
       viewer.onWindowResize()
 
@@ -152,7 +93,7 @@ export class Visual implements IVisual {
 
     if (options.type != powerbi.VisualUpdateType.Data) return
 
-    console.log("Update START:", this.loadedUrls)
+    console.log("Update START:", options)
     var table = options.dataViews[0].table
     var objectsToLoad = table?.rows
     console.log("Update: load", objectsToLoad)
@@ -171,10 +112,10 @@ export class Visual implements IVisual {
           // this.objectToSelectionId[objId] = [selection, obj[0]]
           try {
             var url = `${obj[0]}/objects/${obj[1]}`
-            console.log("Update: Loading object", url)
+            //console.log("Update: Loading object", url)
             this.loadedUrls[url] = 0
             var res = this.viewer.loadObject(url, null, false).then(() => {
-              console.log("Update: Loaded object", url)
+              //console.log("Update: Loaded object", url)
             })
             objPromises.push(res)
           } catch (e) {

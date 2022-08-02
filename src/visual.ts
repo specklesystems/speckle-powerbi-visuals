@@ -42,22 +42,23 @@ import { Viewer, DefaultViewerParams } from "@speckle/viewer"
 
 export class Visual implements IVisual {
   private target: HTMLElement
-  private updateCount: number
   private settings: VisualSettings
-  private textNode: Text
   private host: powerbi.extensibility.IVisualHost
   private selectionManager: powerbi.extensibility.ISelectionManager
+  private viewer: Viewer
 
   constructor(options: VisualConstructorOptions) {
     console.log("Speckle 3D Visual constructor called", options)
-    options.host.hostCapabilities.allowInteractions = true
-
     this.host = options.host
+    console.log("options module", options.module)
     //@ts-ignore
     this.selectionManager = this.host.createSelectionManager()
 
+    this.selectionManager.registerOnSelectCallback(ids => {
+      console.log("powerbi selected something", ids)
+    })
+
     this.target = options.element
-    this.updateCount = 0
     if (document) {
       var container = this.target.appendChild(document.createElement("div"))
       container.style.backgroundColor = "transparent"
@@ -70,15 +71,11 @@ export class Visual implements IVisual {
       const viewer = new Viewer(container, params)
       viewer.init().then(() => {
         viewer.onWindowResize()
-        viewer.loadObject(
-          "https://latest.speckle.dev/streams/5a8e6d1372/objects/37bb4395d08338c97bb05f814f0ef4d3",
-          null,
-          false
-        )
 
         viewer.on(
           "load-progress",
           (a: { progress: number; id: string; url: string }) => {
+            this.loadedUrls[a.url] = a.progress
             if (a.progress >= 1) {
               viewer.onWindowResize()
             }
@@ -86,24 +83,110 @@ export class Visual implements IVisual {
         )
 
         viewer.on("load-complete", () => {
-          console.log("Load complete")
+          //console.log("Load complete")
         })
 
         viewer.on("select", o => {
-          console.log("selection-changed", o)
+          //console.log("selection-changed", o)
+          if (o.userData.length == 0) {
+            return
+          }
+          //var ids = o.userData.map(data => this.objectToSelectionId[data.id][0])
+          //console.log("selection ids", ids, this.objectToSelectionId)
+          //this.selectionManager.select(ids)
         })
+
+        this.viewer = viewer
       })
     }
   }
+  public initViewer() {
+    var container = this.target.appendChild(document.createElement("div"))
+    container.style.backgroundColor = "transparent"
+    container.style.height = "100%"
+    container.style.width = "100%"
+    container.style.position = "fixed"
+    const params = DefaultViewerParams
+    params.showStats = true
+
+    const viewer = new Viewer(container, params)
+    viewer.init().then(() => {
+      viewer.onWindowResize()
+
+      viewer.on(
+        "load-progress",
+        (a: { progress: number; id: string; url: string }) => {
+          this.loadedUrls[a.url] = a.progress
+          if (a.progress >= 1) {
+            viewer.onWindowResize()
+          }
+        }
+      )
+
+      viewer.on("load-complete", () => {
+        //console.log("Load complete")
+      })
+
+      viewer.on("select", o => {
+        //console.log("selection-changed", o)
+        if (o.userData.length == 0) {
+          return
+        }
+        //var ids = o.userData.map(data => this.objectToSelectionId[data.id][0])
+        //console.log("selection ids", ids, this.objectToSelectionId)
+        //this.selectionManager.select(ids)
+      })
+
+      this.viewer = viewer
+    })
+  }
+
+  private loadedUrls = {}
 
   public update(options: VisualUpdateOptions) {
+    console.log("Update was called with options", options)
     this.settings = Visual.parseSettings(
       options && options.dataViews && options.dataViews[0]
     )
-    console.log("Visual update", options)
-    if (this.textNode) {
-      this.textNode.textContent = (this.updateCount++).toString()
-    }
+    console.log("Settings", this.settings)
+
+    if (options.type != powerbi.VisualUpdateType.Data) return
+
+    console.log("Update START:", this.loadedUrls)
+    var table = options.dataViews[0].table
+    var objectsToLoad = table?.rows
+    console.log("Update: load", objectsToLoad)
+
+    this.viewer
+      .unloadAll()
+      .then(() => {
+        var objPromises = []
+        objectsToLoad.forEach((obj, index) => {
+          // const selection: powerbi.extensibility.ISelectionId = this.host
+          //   //@ts-ignore
+          //   .createSelectionIdBuilder()
+          //   .withTable(table, index)
+          //   .createSelectionId()
+
+          // this.objectToSelectionId[objId] = [selection, obj[0]]
+          try {
+            var url = `${obj[0]}/objects/${obj[1]}`
+            console.log("Update: Loading object", url)
+            this.loadedUrls[url] = 0
+            var res = this.viewer.loadObject(url, null, false).then(() => {
+              console.log("Update: Loaded object", url)
+            })
+            objPromises.push(res)
+          } catch (e) {
+            console.warn("error fetching object: " + url, e)
+          }
+        })
+        return Promise.all(objPromises)
+      })
+      .then(() => {
+        //this.viewer.zoomExtents()
+        console.log("Update END:", this.loadedUrls)
+      })
   }
 
   private static parseSettings(dataView: DataView): VisualSettings {

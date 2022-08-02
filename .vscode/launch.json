@@ -5,7 +5,7 @@
             "name": "Debugger",
             "type": "chrome",
             "request": "attach",
-            "port": 9222,
+            "port": 8080,
             "sourceMaps": true,
             "webRoot": "${cwd}/"
         }

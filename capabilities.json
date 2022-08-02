@@ -1,79 +1,37 @@
 {
   "dataRoles": [
     {
-      "displayName": "Category Data",
-      "name": "category",
-      "kind": "Grouping"
+      "displayName": "Stream ID",
+      "name": "stream",
+      "kind": "GroupingOrMeasure"
     },
     {
-      "displayName": "Measure Data",
-      "name": "measure",
-      "kind": "Measure"
+      "displayName": "Object ID",
+      "name": "object",
+      "kind": "GroupingOrMeasure"
     }
   ],
-  "objects": {
-    "dataPoint": {
-      "displayName": "Data colors",
-      "properties": {
-        "defaultColor": {
-          "displayName": "Default color",
-          "type": {
-            "fill": {
-              "solid": {
-                "color": true
-              }
-            }
-          }
-        },
-        "showAllDataPoints": {
-          "displayName": "Show all",
-          "type": {
-            "bool": true
-          }
-        },
-        "fill": {
-          "displayName": "Fill",
-          "type": {
-            "fill": {
-              "solid": {
-                "color": true
-              }
-            }
-          }
-        },
-        "fillRule": {
-          "displayName": "Color saturation",
-          "type": {
-            "fill": {}
-          }
-        },
-        "fontSize": {
-          "displayName": "Text Size",
-          "type": {
-            "formatting": {
-              "fontSize": true
-            }
-          }
-        }
-      }
-    }
-  },
   "dataViewMappings": [
     {
       "categorical": {
         "categories": {
-          "for": {
-            "in": "category"
-          },
-          "dataReductionAlgorithm": {
-            "top": {}
-          }
+          "for": { "in": "object" }
         },
         "values": {
+          "for": { "in": "stream" }
+        }
+      },
+      "table": {
+        "rows": {
           "select": [
             {
-              "bind": {
-                "to": "measure"
+              "for": {
+                "in": "stream"
+              }
+            },
+            {
+              "for": {
+                "in": "object"
               }
             }
           ]
@@ -81,6 +39,5 @@
       }
     }
   ],
-  "supportsEmptyDataView": true,
-  "supportsMultiVisualSelection": true
+  "supportsHighlight": true
 }

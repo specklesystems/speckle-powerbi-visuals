@@ -39,5 +39,17 @@
       }
     }
   ],
-  "supportsHighlight": true
+  "supportsHighlight": true,
+  "supportsMultiVisualSelection": true,
+  "privileges": [
+    {
+      "name": "WebAccess",
+      "essential": true,
+      "parameters": ["https://speckle.xyz"]
+    },
+    {
+      "name": "ExportContent",
+      "essential": false
+    }
+  ]
 }

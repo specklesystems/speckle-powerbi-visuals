@@ -20,15 +20,17 @@ export class Visual implements IVisual {
   private settings: VisualSettings
   private host: powerbi.extensibility.IVisualHost
   private selectionManager: powerbi.extensibility.ISelectionManager
+  private selectionIdMap: Map<string, any>
   private viewer: Viewer
 
   constructor(options: VisualConstructorOptions) {
     console.log("Speckle 3D Visual constructor called", options)
     this.host = options.host
     console.log("options module", options.module)
+
+    this.selectionIdMap = new Map<string, any>()
     //@ts-ignore
     this.selectionManager = this.host.createSelectionManager()
-
     this.selectionManager.registerOnSelectCallback(ids => {
       console.log("powerbi selected something", ids)
     })
@@ -47,7 +49,7 @@ export class Visual implements IVisual {
 
     const params = DefaultViewerParams
     // Uncomment the line below to show stats
-    //params.showStats = true
+    params.showStats = true
 
     const viewer = new Viewer(container, params)
 
@@ -73,8 +75,7 @@ export class Visual implements IVisual {
         if (o.userData.length == 0) {
           return
         }
-        //var ids = o.userData.map(data => this.objectToSelectionId[data.id][0])
-        //console.log("selection ids", ids, this.objectToSelectionId)
+        //var ids = o.userData.map(data => this.selectionIdMap[data.id][0])
         //this.selectionManager.select(ids)
       })
 
@@ -90,44 +91,58 @@ export class Visual implements IVisual {
       options && options.dataViews && options.dataViews[0]
     )
     console.log("Settings", this.settings)
-
+    console.log("update type", options.type)
     if (options.type != powerbi.VisualUpdateType.Data) return
 
     console.log("Update START:", options)
-    var table = options.dataViews[0].table
-    var objectsToLoad = table?.rows
-    console.log("Update: load", objectsToLoad)
 
-    this.viewer
-      .unloadAll()
-      .then(() => {
-        var objPromises = []
-        objectsToLoad.forEach((obj, index) => {
-          // const selection: powerbi.extensibility.ISelectionId = this.host
-          //   //@ts-ignore
-          //   .createSelectionIdBuilder()
-          //   .withTable(table, index)
-          //   .createSelectionId()
+    var categoricalView = options.dataViews[0].categorical
+    var streamCategory = categoricalView?.categories[0].values
+    var objectIdCategory = categoricalView?.categories[1].values
+    var highlightedValues = categoricalView?.values
+      ? categoricalView?.values[0].highlights
+      : null
+    var objectUrls = streamCategory.map(
+      (stream, index) => `${stream}/objects/${objectIdCategory[index]}`
+    )
+    var objectsToUnload = []
+    for (const key in this.selectionIdMap.keys()) {
+      if (!objectUrls.find(item => item == key)) {
+        objectsToUnload.push(key)
+      }
+    }
+    objectsToUnload.forEach(url => {
+      this.viewer.unloadObject(url)
+      this.selectionIdMap.delete(url)
+    })
 
-          // this.objectToSelectionId[objId] = [selection, obj[0]]
-          try {
-            var url = `${obj[0]}/objects/${obj[1]}`
-            //console.log("Update: Loading object", url)
-            this.loadedUrls[url] = 0
-            var res = this.viewer.loadObject(url, null, false).then(() => {
-              //console.log("Update: Loaded object", url)
-            })
-            objPromises.push(res)
-          } catch (e) {
-            console.warn("error fetching object: " + url, e)
-          }
-        })
-        return Promise.all(objPromises)
+    var loadedObjects = []
+    var promises = objectUrls.map(url => {
+      loadedObjects.push(url)
+      if (!this.selectionIdMap.has(url)) {
+        this.selectionIdMap.set(url, true)
+        return this.viewer.loadObject(url, null, false)
+      }
+    })
+
+    console.log("highlight values", highlightedValues)
+    if (highlightedValues) {
+      this.viewer.applyFilter({
+        filterBy: {
+          id: highlightedValues
+            .map((value, index) => (value ? objectIdCategory[index] : null))
+            .filter(e => e != null)
+        },
+        colorBy: {
+          property: "speckle_type",
+          type: "category"
+        },
+        ghostOthers: true
       })
-      .then(() => {
-        //this.viewer.zoomExtents()
-        console.log("Update END:", this.loadedUrls)
-      })
+    } else {
+      this.viewer.applyFilter(null)
+    }
+    return Promise.all(promises)
   }
 
   private static parseSettings(dataView: DataView): VisualSettings {

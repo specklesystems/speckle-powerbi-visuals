@@ -3,26 +3,23 @@
     {
       "displayName": "Stream ID",
       "name": "stream",
-      "kind": "GroupingOrMeasure"
+      "kind": "Grouping"
     },
     {
       "displayName": "Object ID",
       "name": "object",
       "kind": "GroupingOrMeasure"
+    },
+    {
+      "displayName": "Object Data",
+      "name": "objectData",
+      "kind": "Measure"
     }
   ],
   "dataViewMappings": [
     {
       "categorical": {
         "categories": {
-          "for": { "in": "object" }
-        },
-        "values": {
-          "for": { "in": "stream" }
-        }
-      },
-      "table": {
-        "rows": {
           "select": [
             {
               "for": {
@@ -35,17 +32,31 @@
               }
             }
           ]
+        },
+        "values": {
+          "for": { "in": "objectData" }
         }
       }
     }
   ],
   "supportsHighlight": true,
   "supportsMultiVisualSelection": true,
+  "suppressDefaultTitle": true,
+  "tooltips": {
+    "supportEnhancedTooltips": true
+  },
+  "drilldown": {
+    "roles": ["stream", "object"]
+  },
   "privileges": [
     {
       "name": "WebAccess",
       "essential": true,
-      "parameters": ["https://speckle.xyz"]
+      "parameters": [
+        "https://speckle.xyz",
+        "https://*.speckle.xyz",
+        "https://*.speckle.dev"
+      ]
     },
     {
       "name": "ExportContent",

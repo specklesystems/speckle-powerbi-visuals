@@ -12,12 +12,12 @@ import VisualObjectInstance = powerbi.VisualObjectInstance
 import DataView = powerbi.DataView
 import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject
 
-import { VisualSettings } from "./settings"
+import { SpeckleVisualSettings } from "./settings"
 import { Viewer, DefaultViewerParams } from "@speckle/viewer"
 
 export class Visual implements IVisual {
   private target: HTMLElement
-  private settings: VisualSettings
+  private settings: SpeckleVisualSettings
   private host: powerbi.extensibility.IVisualHost
   private selectionManager: powerbi.extensibility.ISelectionManager
   private selectionIdMap: Map<string, any>
@@ -40,6 +40,7 @@ export class Visual implements IVisual {
       this.initViewer()
     }
   }
+
   public initViewer() {
     var container = this.target.appendChild(document.createElement("div"))
     container.style.backgroundColor = "transparent"
@@ -86,22 +87,49 @@ export class Visual implements IVisual {
   private loadedUrls = {}
 
   public update(options: VisualUpdateOptions) {
-    console.log("Update was called with options", options)
     this.settings = Visual.parseSettings(
       options && options.dataViews && options.dataViews[0]
     )
-    console.log("Settings", this.settings)
-    console.log("update type", options.type)
-    if (options.type != powerbi.VisualUpdateType.Data) return
+    console.log(
+      `Update was called with update type ${options.type.toString()}`,
+      options,
+      this.settings
+    )
 
-    console.log("Update START:", options)
+    // TODO: These cases are not being handled right now, we will skip the update logic.
+    // Some are already handled by our viewer, such as resize, but others may require custom implementations in the future.
+    switch (options.type) {
+      case powerbi.VisualUpdateType.Resize:
+      case powerbi.VisualUpdateType.ResizeEnd:
+      case powerbi.VisualUpdateType.Style:
+      case powerbi.VisualUpdateType.ViewMode:
+      case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
+        // Ignore case, nothing will happen
+        return
+    }
+    // Handle changes in the visual objects
+    this.handleSettingsUpdate(options)
+    // Handle the update in data passed to this visual
+    return this.handleDataUpdate(options)
+  }
 
+  private handleSettingsUpdate(options: VisualUpdateOptions) {
+    var metadata = options.dataViews[0].metadata
+    if (!metadata) return // Fast exit if there is no metadata
+
+    if (metadata.objects) {
+      metadata.objects
+    }
+  }
+
+  private handleDataUpdate(options: VisualUpdateOptions) {
     var categoricalView = options.dataViews[0].categorical
     var streamCategory = categoricalView?.categories[0].values
     var objectIdCategory = categoricalView?.categories[1].values
     var highlightedValues = categoricalView?.values
       ? categoricalView?.values[0].highlights
       : null
+
     var objectUrls = streamCategory.map(
       (stream, index) => `${stream}/objects/${objectIdCategory[index]}`
     )
@@ -111,21 +139,23 @@ export class Visual implements IVisual {
         objectsToUnload.push(key)
       }
     }
-    objectsToUnload.forEach(url => {
-      this.viewer.unloadObject(url)
-      this.selectionIdMap.delete(url)
+
+    var unloadPromises = objectsToUnload.map(url => {
+      return this.viewer.unloadObject(url).then(_ => {
+        this.selectionIdMap.delete(url)
+      })
     })
 
     var loadedObjects = []
-    var promises = objectUrls.map(url => {
+    var loadPromises = objectUrls.map(url => {
       loadedObjects.push(url)
       if (!this.selectionIdMap.has(url)) {
-        this.selectionIdMap.set(url, true)
-        return this.viewer.loadObject(url, null, false)
+        return this.viewer.loadObject(url, null, false).then(_ => {
+          this.selectionIdMap.set(url, true)
+        })
       }
     })
 
-    console.log("highlight values", highlightedValues)
     if (highlightedValues) {
       this.viewer.applyFilter({
         filterBy: {
@@ -133,20 +163,21 @@ export class Visual implements IVisual {
             .map((value, index) => (value ? objectIdCategory[index] : null))
             .filter(e => e != null)
         },
-        colorBy: {
-          property: "speckle_type",
-          type: "category"
-        },
         ghostOthers: true
       })
     } else {
       this.viewer.applyFilter(null)
     }
-    return Promise.all(promises)
+
+    var all = unloadPromises.concat(loadPromises)
+    return Promise.all(all).then(_ => {
+      console.log(this.viewer.sceneManager.views)
+      this.viewer.interactions.setView("top")
+    })
   }
 
-  private static parseSettings(dataView: DataView): VisualSettings {
-    return <VisualSettings>VisualSettings.parse(dataView)
+  private static parseSettings(dataView: DataView): SpeckleVisualSettings {
+    return <SpeckleVisualSettings>SpeckleVisualSettings.parse(dataView)
   }
 
   /**
@@ -157,8 +188,8 @@ export class Visual implements IVisual {
   public enumerateObjectInstances(
     options: EnumerateVisualObjectInstancesOptions
   ): VisualObjectInstance[] | VisualObjectInstanceEnumerationObject {
-    return VisualSettings.enumerateObjectInstances(
-      this.settings || VisualSettings.getDefault(),
+    return SpeckleVisualSettings.enumerateObjectInstances(
+      this.settings || SpeckleVisualSettings.getDefault(),
       options
     )
   }

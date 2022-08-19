@@ -48,6 +48,53 @@
   "drilldown": {
     "roles": ["stream", "object"]
   },
+  "objects": {
+    "camera": {
+      "displayName": "My Object Name",
+      "properties": {
+        "orthoMode": {
+          "displayName": "Ortho camera",
+          "type": { "bool": true }
+        },
+        "defaultView": {
+          "displayName": "Default view",
+          "type": {
+            "enumeration": [
+              {
+                "displayName": "Top",
+                "displayNameKey": "top",
+                "value": "top"
+              },
+              {
+                "displayName": "Front",
+                "displayNameKey": "front",
+                "value": "front"
+              },
+              {
+                "displayName": "Left",
+                "displayNameKey": "left",
+                "value": "left"
+              },
+              {
+                "displayName": "Back",
+                "displayNameKey": "back",
+                "value": "back"
+              },
+              {
+                "displayName": "Right",
+                "displayNameKey": "right",
+                "value": "right"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "colors": {
+      "displayName": "Colors",
+      "properties": {}
+    }
+  },
   "privileges": [
     {
       "name": "WebAccess",

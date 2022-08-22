@@ -26,14 +26,10 @@ export class Visual implements IVisual {
   constructor(options: VisualConstructorOptions) {
     console.log("Speckle 3D Visual constructor called", options)
     this.host = options.host
-    console.log("options module", options.module)
 
     this.selectionIdMap = new Map<string, any>()
     //@ts-ignore
     this.selectionManager = this.host.createSelectionManager()
-    this.selectionManager.registerOnSelectCallback(ids => {
-      console.log("powerbi selected something", ids)
-    })
 
     this.target = options.element
     if (document) {
@@ -72,12 +68,13 @@ export class Visual implements IVisual {
       })
 
       viewer.on("select", o => {
-        //console.log("selection-changed", o)
-        if (o.userData.length == 0) {
-          return
-        }
-        //var ids = o.userData.map(data => this.selectionIdMap[data.id][0])
-        //this.selectionManager.select(ids)
+        if (o.location == null) return
+        console.log("viewer object selected", o)
+        //var ids = o.userData.map(data => this.selectionIdMap[data.id])
+        // this.selectionManager.showContextMenu(ids[0] ?? {}, {
+        //   x: rect.top + o.location.x,
+        //   y: rect.left + o.location.y
+        // })
       })
 
       this.viewer = viewer
@@ -107,6 +104,8 @@ export class Visual implements IVisual {
         // Ignore case, nothing will happen
         return
     }
+
+    console.log("Data was updated, updating viewer...")
     // Handle changes in the visual objects
     this.handleSettingsUpdate(options)
     // Handle the update in data passed to this visual
@@ -114,12 +113,14 @@ export class Visual implements IVisual {
   }
 
   private handleSettingsUpdate(options: VisualUpdateOptions) {
-    var metadata = options.dataViews[0].metadata
-    if (!metadata) return // Fast exit if there is no metadata
+    // Handle change in ortho mode
+    if (this.settings.camera.orthoMode)
+      this.viewer.cameraHandler.setOrthoCameraOn()
+    else this.viewer.cameraHandler.setPerspectiveCameraOn()
 
-    if (metadata.objects) {
-      metadata.objects
-    }
+    // Handle change in default view
+    if (this.settings.camera.defaultView != "perspective")
+      this.viewer.interactions.rotateTo(this.settings.camera.defaultView)
   }
 
   private handleDataUpdate(options: VisualUpdateOptions) {
@@ -130,9 +131,13 @@ export class Visual implements IVisual {
       ? categoricalView?.values[0].highlights
       : null
 
-    var objectUrls = streamCategory.map(
-      (stream, index) => `${stream}/objects/${objectIdCategory[index]}`
-    )
+    //@ts-ignore
+    var selectionBuilder = this.host.createSelectionIdBuilder()
+
+    var objectUrls = streamCategory.map((stream, index) => {
+      var url = `${stream}/objects/${objectIdCategory[index]}`
+      return url
+    })
     var objectsToUnload = []
     for (const key in this.selectionIdMap.keys()) {
       if (!objectUrls.find(item => item == key)) {
@@ -142,38 +147,72 @@ export class Visual implements IVisual {
 
     var unloadPromises = objectsToUnload.map(url => {
       return this.viewer.unloadObject(url).then(_ => {
-        this.selectionIdMap.delete(url)
+        this.selectionIdMap.delete(url.split("/").slice(-1).pop())
       })
     })
 
-    var loadedObjects = []
-    var loadPromises = objectUrls.map(url => {
-      loadedObjects.push(url)
-      if (!this.selectionIdMap.has(url)) {
+    var loadPromises = objectUrls.map((url, index) => {
+      if (!this.selectionIdMap.has(url.split("/").slice(-1).pop())) {
+        var selectionId = selectionBuilder.withCategory(
+          categoricalView?.categories[1].values[index]
+        )
         return this.viewer.loadObject(url, null, false).then(_ => {
-          this.selectionIdMap.set(url, true)
+          this.selectionIdMap.set(
+            categoricalView?.categories[1].values[index].toString(),
+            selectionId
+          )
         })
       }
     })
 
-    if (highlightedValues) {
-      this.viewer.applyFilter({
-        filterBy: {
-          id: highlightedValues
-            .map((value, index) => (value ? objectIdCategory[index] : null))
-            .filter(e => e != null)
-        },
-        ghostOthers: true
-      })
-    } else {
-      this.viewer.applyFilter(null)
-    }
+    var unloadRes = Promise.all(unloadPromises)
+    var loadRes = Promise.all(loadPromises)
 
-    var all = unloadPromises.concat(loadPromises)
-    return Promise.all(all).then(_ => {
-      console.log(this.viewer.sceneManager.views)
-      this.viewer.interactions.setView("top")
-    })
+    return unloadRes
+      .then(_ => loadRes)
+      .then(_ => {
+        var colorList = this.settings.color.getColorList()
+        // Once everything is loaded, run the filter
+        var filter = null
+        if (categoricalView?.values) {
+          var name = categoricalView?.values[0].source.displayName
+          var isNum =
+            categoricalView?.values[0].source.type.numeric ||
+            categoricalView?.values[0].source.type.integer
+          var filterType = isNum ? "gradient" : "category"
+          console.log("filter:", filterType, name)
+          if (highlightedValues)
+            filter = {
+              filterBy: {
+                id: highlightedValues
+                  .map((value, index) =>
+                    value ? objectIdCategory[index] : null
+                  )
+                  .filter(e => e != null)
+              },
+              ghostOthers: true,
+              colorBy: {
+                type: filterType,
+                property: name,
+                gradientColors: isNum ? colorList : undefined,
+                minValue: categoricalView?.values[0].minLocal,
+                maxValue: categoricalView?.values[0].maxLocal
+              }
+            }
+          else
+            filter = {
+              colorBy: {
+                type: filterType,
+                property: name
+              }
+            }
+          this.viewer.applyFilter(filter)
+        } else {
+          console.log("filter: none")
+        }
+        console.log("filter:", filter)
+        this.viewer.applyFilter(filter)
+      })
   }
 
   private static parseSettings(dataView: DataView): SpeckleVisualSettings {

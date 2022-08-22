@@ -42,6 +42,8 @@
   "supportsHighlight": true,
   "supportsMultiVisualSelection": true,
   "suppressDefaultTitle": true,
+  "supportsSynchronizingFilterState": true,
+  "supportsKeyboardFocus": true,
   "tooltips": {
     "supportEnhancedTooltips": true
   },
@@ -50,16 +52,21 @@
   },
   "objects": {
     "camera": {
-      "displayName": "My Object Name",
+      "displayName": "Camera",
       "properties": {
         "orthoMode": {
-          "displayName": "Ortho camera",
+          "displayName": "Ortho mode",
           "type": { "bool": true }
         },
         "defaultView": {
           "displayName": "Default view",
           "type": {
             "enumeration": [
+              {
+                "displayName": "Perspective",
+                "displayNameKey": "perspective",
+                "value": "perspective"
+              },
               {
                 "displayName": "Top",
                 "displayNameKey": "top",
@@ -90,9 +97,40 @@
         }
       }
     },
-    "colors": {
-      "displayName": "Colors",
-      "properties": {}
+    "color": {
+      "displayName": "Color",
+      "properties": {
+        "startColor": {
+          "displayName": "Start Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "midColor": {
+          "displayName": "Middle Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "endColor": {
+          "displayName": "End Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        }
+      }
     }
   },
   "privileges": [

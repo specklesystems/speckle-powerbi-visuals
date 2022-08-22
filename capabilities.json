@@ -3,26 +3,23 @@
     {
       "displayName": "Stream ID",
       "name": "stream",
-      "kind": "GroupingOrMeasure"
+      "kind": "Grouping"
     },
     {
       "displayName": "Object ID",
       "name": "object",
       "kind": "GroupingOrMeasure"
+    },
+    {
+      "displayName": "Object Data",
+      "name": "objectData",
+      "kind": "Measure"
     }
   ],
   "dataViewMappings": [
     {
       "categorical": {
         "categories": {
-          "for": { "in": "object" }
-        },
-        "values": {
-          "for": { "in": "stream" }
-        }
-      },
-      "table": {
-        "rows": {
           "select": [
             {
               "for": {
@@ -35,9 +32,120 @@
               }
             }
           ]
+        },
+        "values": {
+          "for": { "in": "objectData" }
         }
       }
     }
   ],
-  "supportsHighlight": true
+  "supportsHighlight": true,
+  "supportsMultiVisualSelection": true,
+  "suppressDefaultTitle": true,
+  "supportsSynchronizingFilterState": true,
+  "supportsKeyboardFocus": true,
+  "tooltips": {
+    "supportEnhancedTooltips": true
+  },
+  "drilldown": {
+    "roles": ["stream", "object"]
+  },
+  "objects": {
+    "camera": {
+      "displayName": "Camera",
+      "properties": {
+        "orthoMode": {
+          "displayName": "Ortho mode",
+          "type": { "bool": true }
+        },
+        "defaultView": {
+          "displayName": "Default view",
+          "type": {
+            "enumeration": [
+              {
+                "displayName": "Perspective",
+                "displayNameKey": "perspective",
+                "value": "perspective"
+              },
+              {
+                "displayName": "Top",
+                "displayNameKey": "top",
+                "value": "top"
+              },
+              {
+                "displayName": "Front",
+                "displayNameKey": "front",
+                "value": "front"
+              },
+              {
+                "displayName": "Left",
+                "displayNameKey": "left",
+                "value": "left"
+              },
+              {
+                "displayName": "Back",
+                "displayNameKey": "back",
+                "value": "back"
+              },
+              {
+                "displayName": "Right",
+                "displayNameKey": "right",
+                "value": "right"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "color": {
+      "displayName": "Color",
+      "properties": {
+        "startColor": {
+          "displayName": "Start Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "midColor": {
+          "displayName": "Middle Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "endColor": {
+          "displayName": "End Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "privileges": [
+    {
+      "name": "WebAccess",
+      "essential": true,
+      "parameters": [
+        "https://speckle.xyz",
+        "https://*.speckle.xyz",
+        "https://*.speckle.dev"
+      ]
+    },
+    {
+      "name": "ExportContent",
+      "essential": false
+    }
+  ]
 }

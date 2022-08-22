@@ -32,12 +32,14 @@ export class Visual implements IVisual {
     this.selectionManager = this.host.createSelectionManager()
 
     this.target = options.element
-    if (document) {
-      this.initViewer()
-    }
   }
 
-  public initViewer() {
+  public async initViewer() {
+    if (this.viewer) {
+      console.log("Viewer was already initialized. Skipping init call...")
+      return
+    }
+
     var container = this.target.appendChild(document.createElement("div"))
     container.style.backgroundColor = "transparent"
     container.style.height = "100%"
@@ -50,7 +52,7 @@ export class Visual implements IVisual {
 
     const viewer = new Viewer(container, params)
 
-    viewer.init().then(() => {
+    return viewer.init().then(() => {
       viewer.onWindowResize()
 
       viewer.on(
@@ -87,6 +89,7 @@ export class Visual implements IVisual {
     this.settings = Visual.parseSettings(
       options && options.dataViews && options.dataViews[0]
     )
+
     console.log(
       `Update was called with update type ${options.type.toString()}`,
       options,
@@ -106,21 +109,26 @@ export class Visual implements IVisual {
     }
 
     console.log("Data was updated, updating viewer...")
-    // Handle changes in the visual objects
-    this.handleSettingsUpdate(options)
-    // Handle the update in data passed to this visual
-    return this.handleDataUpdate(options)
+    this.initViewer().then(_ => {
+      // Handle changes in the visual objects
+      this.handleSettingsUpdate(options)
+      // Handle the update in data passed to this visual
+      return this.handleDataUpdate(options)
+    })
   }
 
   private handleSettingsUpdate(options: VisualUpdateOptions) {
     // Handle change in ortho mode
     if (this.settings.camera.orthoMode)
-      this.viewer.cameraHandler.setOrthoCameraOn()
-    else this.viewer.cameraHandler.setPerspectiveCameraOn()
+      this.viewer?.cameraHandler?.setOrthoCameraOn()
+    else this.viewer?.cameraHandler?.setPerspectiveCameraOn()
 
     // Handle change in default view
     if (this.settings.camera.defaultView != "perspective")
       this.viewer.interactions.rotateTo(this.settings.camera.defaultView)
+
+    // Update bg of viewer
+    this.target.style.backgroundColor = this.settings.color.background
   }
 
   private handleDataUpdate(options: VisualUpdateOptions) {
@@ -131,6 +139,7 @@ export class Visual implements IVisual {
       ? categoricalView?.values[0].highlights
       : null
 
+    console.log("Viewer loading:", options)
     //@ts-ignore
     var selectionBuilder = this.host.createSelectionIdBuilder()
 
@@ -140,15 +149,20 @@ export class Visual implements IVisual {
     })
     var objectsToUnload = []
     for (const key in this.selectionIdMap.keys()) {
-      if (!objectUrls.find(item => item == key)) {
+      if (!objectUrls.find(url => url.split("/").slice(-1).pop() == key)) {
         objectsToUnload.push(key)
       }
     }
-
+    console.log(
+      `Viewer loading ${objectUrls.length} and unloading ${objectsToUnload.length}`
+    )
     var unloadPromises = objectsToUnload.map(url => {
-      return this.viewer.unloadObject(url).then(_ => {
-        this.selectionIdMap.delete(url.split("/").slice(-1).pop())
-      })
+      return this.viewer
+        .unloadObject(url)
+        .then(_ => {
+          this.selectionIdMap.delete(url.split("/").slice(-1).pop())
+        })
+        .catch(e => console.warn("Viewer Unload error", url, e))
     })
 
     var loadPromises = objectUrls.map((url, index) => {
@@ -156,12 +170,17 @@ export class Visual implements IVisual {
         var selectionId = selectionBuilder.withCategory(
           categoricalView?.categories[1].values[index]
         )
-        return this.viewer.loadObject(url, null, false).then(_ => {
-          this.selectionIdMap.set(
-            categoricalView?.categories[1].values[index].toString(),
-            selectionId
-          )
-        })
+        return this.viewer
+          .loadObject(url, null, false)
+          .then(_ => {
+            this.selectionIdMap.set(
+              categoricalView?.categories[1].values[index].toString(),
+              selectionId
+            )
+          })
+          .catch(e => {
+            console.warn("Viewer Load error", url, e)
+          })
       }
     })
 
@@ -193,7 +212,7 @@ export class Visual implements IVisual {
               ghostOthers: true,
               colorBy: {
                 type: filterType,
-                property: name,
+                property: this.cleanupDataColumnName(name),
                 gradientColors: isNum ? colorList : undefined,
                 minValue: categoricalView?.values[0].minLocal,
                 maxValue: categoricalView?.values[0].maxLocal
@@ -201,20 +220,38 @@ export class Visual implements IVisual {
             }
           else
             filter = {
+              filterBy: {
+                id: objectIdCategory
+              },
               colorBy: {
                 type: filterType,
-                property: name
+                property: this.cleanupDataColumnName(name),
+                gradientColors: isNum ? colorList : undefined,
+                minValue: categoricalView?.values[0].minLocal,
+                maxValue: categoricalView?.values[0].maxLocal
               }
             }
-          this.viewer.applyFilter(filter)
-        } else {
-          console.log("filter: none")
         }
         console.log("filter:", filter)
-        this.viewer.applyFilter(filter)
+        return this.viewer.applyFilter(filter).catch(e => {
+          console.warn("Filter failed to be applied. Filter will be reset", e)
+          return this.viewer.applyFilter(null)
+        })
       })
   }
-
+  private cleanupDataColumnName(name: string) {
+    var cleanName = name
+    var prefixes = ["First ", "Last ", "Count of "]
+    for (let i = 0; i < prefixes.length; i++) {
+      const prefix = prefixes[i]
+      if (name.startsWith(prefix)) {
+        cleanName = name.slice(prefix.length)
+        break
+      }
+    }
+    console.log("clean name", cleanName)
+    return cleanName
+  }
   private static parseSettings(dataView: DataView): SpeckleVisualSettings {
     return <SpeckleVisualSettings>SpeckleVisualSettings.parse(dataView)
   }

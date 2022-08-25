@@ -241,7 +241,23 @@ export class Visual implements IVisual {
   }
   private cleanupDataColumnName(name: string) {
     var cleanName = name
-    var prefixes = ["First ", "Last ", "Count of "]
+    var simplePrefixes = ["First", "Last"]
+    var compoundPrefixes = [
+      "Count",
+      "Sum",
+      "Average",
+      "Minimum",
+      "Maximum",
+      "Count",
+      "Standard deviation",
+      "Variance",
+      "Median"
+    ].map(prefix => prefix + " of")
+
+    var prefixes = [...simplePrefixes, ...compoundPrefixes].map(
+      prefix => prefix + " "
+    )
+
     for (let i = 0; i < prefixes.length; i++) {
       const prefix = prefixes[i]
       if (name.startsWith(prefix)) {

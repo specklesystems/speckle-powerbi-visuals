@@ -1,7 +1,7 @@
 {
   "dataRoles": [
     {
-      "displayName": "Stream ID",
+      "displayName": "Stream URL",
       "name": "stream",
       "kind": "Grouping"
     },

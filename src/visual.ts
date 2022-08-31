@@ -116,16 +116,22 @@ export class Visual implements IVisual {
       return this.handleDataUpdate(options)
     })
   }
-
+  private currentOrthoMode: boolean = undefined
+  private currentDefaultView: string = undefined
   private handleSettingsUpdate(options: VisualUpdateOptions) {
     // Handle change in ortho mode
-    if (this.settings.camera.orthoMode)
-      this.viewer?.cameraHandler?.setOrthoCameraOn()
-    else this.viewer?.cameraHandler?.setPerspectiveCameraOn()
+    if (this.currentOrthoMode != this.settings.camera.orthoMode) {
+      if (this.settings.camera.orthoMode)
+        this.viewer?.cameraHandler?.setOrthoCameraOn()
+      else this.viewer?.cameraHandler?.setPerspectiveCameraOn()
+      this.currentOrthoMode = this.settings.camera.orthoMode
+    }
 
     // Handle change in default view
-    if (this.settings.camera.defaultView != "perspective")
+    if (this.currentDefaultView != this.settings.camera.defaultView) {
       this.viewer.interactions.rotateTo(this.settings.camera.defaultView)
+      this.currentDefaultView = this.settings.camera.defaultView
+    }
 
     // Update bg of viewer
     this.target.style.backgroundColor = this.settings.color.background
@@ -233,10 +239,13 @@ export class Visual implements IVisual {
             }
         }
         console.log("filter:", filter)
-        return this.viewer.applyFilter(filter).catch(e => {
-          console.warn("Filter failed to be applied. Filter will be reset", e)
-          return this.viewer.applyFilter(null)
-        })
+        return this.viewer
+          .applyFilter(filter)
+          .catch(e => {
+            console.warn("Filter failed to be applied. Filter will be reset", e)
+            return this.viewer.applyFilter(null)
+          })
+          .then(_ => this.viewer.zoomExtents())
       })
   }
   private cleanupDataColumnName(name: string) {

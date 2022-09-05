@@ -147,11 +147,7 @@
     {
       "name": "WebAccess",
       "essential": true,
-      "parameters": [
-        "https://speckle.xyz",
-        "https://*.speckle.xyz",
-        "https://*"
-      ]
+      "parameters": ["*"]
     },
     {
       "name": "ExportContent",

@@ -15,9 +15,9 @@ export class CameraSettings {
 }
 
 export class ColorSettings {
-  public startColor: string = "#000000"
-  public midColor: string = "#000000"
-  public endColor: string = "#000000"
+  public startColor: string = "#31c116"
+  public midColor: string = "#fc8032"
+  public endColor: string = "#e70000"
   public background: string = "#ffffff"
 
   public getColorList() {

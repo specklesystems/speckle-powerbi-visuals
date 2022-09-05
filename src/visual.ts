@@ -274,6 +274,8 @@ export class Visual implements IVisual {
         break
       }
     }
+
+    if (cleanName.startsWith("data.")) cleanName = cleanName.split("data.")[0]
     console.log("clean name", cleanName)
     return cleanName
   }

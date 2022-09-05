@@ -150,7 +150,7 @@
       "parameters": [
         "https://speckle.xyz",
         "https://*.speckle.xyz",
-        "https://*.speckle.dev"
+        "https://*"
       ]
     },
     {

@@ -15,6 +15,7 @@ import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnume
 import { SpeckleVisualSettings } from "./settings"
 import { Viewer, DefaultViewerParams } from "@speckle/viewer"
 import * as _ from "lodash"
+import { VisualUpdateTypeToString, cleanupDataColumnName } from "./utils"
 export class Visual implements IVisual {
   private target: HTMLElement
   private settings: SpeckleVisualSettings
@@ -23,8 +24,32 @@ export class Visual implements IVisual {
   private selectionIdMap: Map<string, any>
   private viewer: Viewer
 
+  private updateTask: Promise<void>
+  private ac = new AbortController()
+  private currentOrthoMode: boolean = undefined
+  private currentDefaultView: string = undefined
+
+  private debounceWait = 500
+
+  private debounceUpdate = _.debounce(options => {
+    this.initViewer().then(async _ => {
+      if (this.updateTask) {
+        this.ac.abort()
+        console.log("Cancelling previous load job")
+        await this.updateTask
+        this.ac = new AbortController()
+      }
+      // Handle changes in the visual objects
+      this.handleSettingsUpdate(options)
+      console.log("Updating viewer with new data")
+      // Handle the update in data passed to this visual
+      this.updateTask = this.handleDataUpdate(options, this.ac.signal).then(
+        () => (this.updateTask = undefined)
+      )
+    })
+  }, this.debounceWait)
+
   constructor(options: VisualConstructorOptions) {
-    console.log("Speckle 3D Visual constructor called", options)
     this.host = options.host
 
     this.selectionIdMap = new Map<string, any>()
@@ -36,7 +61,6 @@ export class Visual implements IVisual {
 
   public async initViewer() {
     if (this.viewer) {
-      console.log("Viewer was already initialized. Skipping init call...")
       return
     }
 
@@ -47,43 +71,14 @@ export class Visual implements IVisual {
     container.style.position = "fixed"
 
     const params = DefaultViewerParams
-    // Uncomment the line below to show stats
-    params.showStats = true
 
     const viewer = new Viewer(container, params)
+    await viewer.init()
 
-    return viewer.init().then(() => {
-      viewer.onWindowResize()
+    // Setup any events here (progress, load-complete...)
 
-      viewer.on(
-        "load-progress",
-        (a: { progress: number; id: string; url: string }) => {
-          this.loadedUrls[a.url] = a.progress
-          if (a.progress >= 1) {
-            viewer.onWindowResize()
-          }
-        }
-      )
-
-      viewer.on("load-complete", () => {
-        //console.log("Load complete")
-      })
-
-      viewer.on("select", o => {
-        if (o.location == null) return
-        console.log("viewer object selected", o)
-        //var ids = o.userData.map(data => this.selectionIdMap[data.id])
-        // this.selectionManager.showContextMenu(ids[0] ?? {}, {
-        //   x: rect.top + o.location.x,
-        //   y: rect.left + o.location.y
-        // })
-      })
-
-      this.viewer = viewer
-    })
+    this.viewer = viewer
   }
-
-  private loadedUrls = {}
 
   public update(options: VisualUpdateOptions) {
     this.settings = Visual.parseSettings(
@@ -91,7 +86,9 @@ export class Visual implements IVisual {
     )
 
     console.log(
-      `Update was called with update type ${options.type.toString()}`,
+      `Update was called with update type ${VisualUpdateTypeToString(
+        options.type
+      )}`,
       options,
       this.settings
     )
@@ -109,33 +106,8 @@ export class Visual implements IVisual {
     }
 
     console.log("Data was updated, updating viewer...")
-    //this.debounceObject(options)
     this.debounceUpdate(options)
   }
-  private updateTask: Promise<void>
-  private ac = new AbortController()
-
-  private debounceUpdate = _.debounce(options => {
-    this.initViewer().then(async _ => {
-      if (this.updateTask) {
-        this.ac.abort()
-        console.log("awaiting cancellation")
-        await this.updateTask
-        console.log("cancellation done")
-        this.ac = new AbortController()
-      }
-      // Handle changes in the visual objects
-      this.handleSettingsUpdate(options)
-      // Handle the update in data passed to this visual
-      this.updateTask = this.handleDataUpdate(options, {
-        signal: this.ac.signal
-      })
-      this.updateTask.then(() => (this.updateTask = undefined))
-    })
-  }, 1000)
-
-  private currentOrthoMode: boolean = undefined
-  private currentDefaultView: string = undefined
 
   private async handleSettingsUpdate(options: VisualUpdateOptions) {
     // Handle change in ortho mode
@@ -158,7 +130,7 @@ export class Visual implements IVisual {
 
   private async handleDataUpdate(
     options: VisualUpdateOptions,
-    abort: { signal: AbortSignal }
+    signal: AbortSignal
   ) {
     var categoricalView = options.dataViews[0].categorical
     var streamCategory = categoricalView?.categories[0].values
@@ -166,15 +138,13 @@ export class Visual implements IVisual {
     var highlightedValues = categoricalView?.values
       ? categoricalView?.values[0].highlights
       : null
-
-    console.log("Viewer loading:", this.viewer, options)
+    if (streamCategory == undefined || objectIdCategory == undefined) {
+      // If some of the fields are not filled in, unload everything
+      return await this.viewer.unloadAll()
+    }
     //@ts-ignore
     var selectionBuilder = this.host.createSelectionIdBuilder()
-    console.log(
-      "test data length",
-      streamCategory.length,
-      objectIdCategory.length
-    )
+
     var objectUrls = streamCategory.map((stream, index) => {
       var url = `${stream}/objects/${objectIdCategory[index]}`
       return url
@@ -190,16 +160,9 @@ export class Visual implements IVisual {
     console.log(
       `Viewer loading ${objectUrls.length} and unloading ${objectsToUnload.length}`
     )
-    if (abort.signal.aborted) {
-      console.log("Viewer aborted load")
-      return
-    }
+
     for (const url of objectsToUnload) {
-      if (abort.signal.aborted) {
-        console.log("Viewer aborted load")
-        return
-      }
-      console.log("unloading object", url, this.viewer["loaders"][url])
+      if (signal?.aborted) return
       await this.viewer
         .cancelLoad(url, true)
         .then(_ => {
@@ -210,10 +173,7 @@ export class Visual implements IVisual {
 
     var index = 0
     for (const url of objectUrls) {
-      if (abort.signal.aborted) {
-        console.log("Viewer aborted load")
-        return
-      }
+      if (signal?.aborted) return
       if (!this.selectionIdMap.has(url)) {
         var selectionId = selectionBuilder.withCategory(
           categoricalView?.categories[1].values[index]
@@ -237,13 +197,14 @@ export class Visual implements IVisual {
     var colorList = this.settings.color.getColorList()
     // Once everything is loaded, run the filter
     var filter = null
+    console.log("categorical view", categoricalView)
     if (categoricalView?.values) {
+      console.log("values exist?")
       var name = categoricalView?.values[0].source.displayName
       var isNum =
         categoricalView?.values[0].source.type.numeric ||
         categoricalView?.values[0].source.type.integer
       var filterType = isNum ? "gradient" : "category"
-      console.log("filter:", filterType, name)
       if (highlightedValues)
         filter = {
           filterBy: {
@@ -254,7 +215,7 @@ export class Visual implements IVisual {
           ghostOthers: true,
           colorBy: {
             type: filterType,
-            property: this.cleanupDataColumnName(name),
+            property: cleanupDataColumnName(name),
             gradientColors: isNum ? colorList : undefined,
             minValue: categoricalView?.values[0].minLocal,
             maxValue: categoricalView?.values[0].maxLocal
@@ -267,18 +228,17 @@ export class Visual implements IVisual {
           },
           colorBy: {
             type: filterType,
-            property: this.cleanupDataColumnName(name),
+            property: cleanupDataColumnName(name),
             gradientColors: isNum ? colorList : undefined,
             minValue: categoricalView?.values[0].minLocal,
             maxValue: categoricalView?.values[0].maxLocal
           }
         }
     }
-    console.log("filter:", filter)
-    if (abort.signal.aborted) {
-      console.log("Viewer aborted load")
-      return
-    }
+
+    if (signal?.aborted) return
+
+    console.log("Applying filter:", filter)
     return await this.viewer
       .applyFilter(filter)
       .catch(e => {
@@ -287,37 +247,7 @@ export class Visual implements IVisual {
       })
       .then(_ => this.viewer.zoomExtents())
   }
-  private cleanupDataColumnName(name: string) {
-    var cleanName = name
-    var simplePrefixes = ["First", "Last"]
-    var compoundPrefixes = [
-      "Count",
-      "Sum",
-      "Average",
-      "Minimum",
-      "Maximum",
-      "Count",
-      "Standard deviation",
-      "Variance",
-      "Median"
-    ].map(prefix => prefix + " of")
 
-    var prefixes = [...simplePrefixes, ...compoundPrefixes].map(
-      prefix => prefix + " "
-    )
-
-    for (let i = 0; i < prefixes.length; i++) {
-      const prefix = prefixes[i]
-      if (name.startsWith(prefix)) {
-        cleanName = name.slice(prefix.length)
-        break
-      }
-    }
-
-    if (cleanName.startsWith("data.")) cleanName = cleanName.split("data.")[0]
-    console.log("clean name", cleanName)
-    return cleanName
-  }
   private static parseSettings(dataView: DataView): SpeckleVisualSettings {
     return <SpeckleVisualSettings>SpeckleVisualSettings.parse(dataView)
   }

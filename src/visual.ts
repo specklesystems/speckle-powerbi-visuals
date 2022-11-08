@@ -113,21 +113,23 @@ export class Visual implements IVisual {
     this.debounceUpdate(options)
   }
   private updateTask: Promise<void>
-  private cancelToken = { cancel: false }
+  private ac = new AbortController()
 
   private debounceUpdate = _.debounce(options => {
     this.initViewer().then(async _ => {
       if (this.updateTask) {
-        this.cancelToken.cancel = true
+        this.ac.abort()
         console.log("awaiting cancellation")
         await this.updateTask
         console.log("cancellation done")
-        this.cancelToken.cancel = false
+        this.ac = new AbortController()
       }
       // Handle changes in the visual objects
       this.handleSettingsUpdate(options)
       // Handle the update in data passed to this visual
-      this.updateTask = this.handleDataUpdate(options, this.cancelToken)
+      this.updateTask = this.handleDataUpdate(options, {
+        signal: this.ac.signal
+      })
       this.updateTask.then(() => (this.updateTask = undefined))
     })
   }, 1000)
@@ -154,7 +156,10 @@ export class Visual implements IVisual {
     this.target.style.backgroundColor = this.settings.color.background
   }
 
-  private async handleDataUpdate(options: VisualUpdateOptions, { cancel }) {
+  private async handleDataUpdate(
+    options: VisualUpdateOptions,
+    abort: { signal: AbortSignal }
+  ) {
     var categoricalView = options.dataViews[0].categorical
     var streamCategory = categoricalView?.categories[0].values
     var objectIdCategory = categoricalView?.categories[1].values
@@ -185,9 +190,15 @@ export class Visual implements IVisual {
     console.log(
       `Viewer loading ${objectUrls.length} and unloading ${objectsToUnload.length}`
     )
-    if (cancel) return
+    if (abort.signal.aborted) {
+      console.log("Viewer aborted load")
+      return
+    }
     for (const url of objectsToUnload) {
-      if (cancel) return
+      if (abort.signal.aborted) {
+        console.log("Viewer aborted load")
+        return
+      }
       console.log("unloading object", url, this.viewer["loaders"][url])
       await this.viewer
         .cancelLoad(url, true)
@@ -199,7 +210,10 @@ export class Visual implements IVisual {
 
     var index = 0
     for (const url of objectUrls) {
-      if (cancel) return
+      if (abort.signal.aborted) {
+        console.log("Viewer aborted load")
+        return
+      }
       if (!this.selectionIdMap.has(url)) {
         var selectionId = selectionBuilder.withCategory(
           categoricalView?.categories[1].values[index]
@@ -261,7 +275,10 @@ export class Visual implements IVisual {
         }
     }
     console.log("filter:", filter)
-    if (cancel) return
+    if (abort.signal.aborted) {
+      console.log("Viewer aborted load")
+      return
+    }
     return await this.viewer
       .applyFilter(filter)
       .catch(e => {

@@ -34,7 +34,12 @@
           ]
         },
         "values": {
-          "for": { "in": "objectData" }
+          "for": { "in": "objectData" },
+          "dataReductionAlgorithm": {
+            "top": {
+              "count": 30000
+            }
+          }
         }
       }
     }

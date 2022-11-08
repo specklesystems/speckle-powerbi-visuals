@@ -14,7 +14,7 @@ import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnume
 
 import { SpeckleVisualSettings } from "./settings"
 import { Viewer, DefaultViewerParams } from "@speckle/viewer"
-
+import * as _ from "lodash"
 export class Visual implements IVisual {
   private target: HTMLElement
   private settings: SpeckleVisualSettings
@@ -109,16 +109,33 @@ export class Visual implements IVisual {
     }
 
     console.log("Data was updated, updating viewer...")
-    this.initViewer().then(_ => {
+    //this.debounceObject(options)
+    this.debounceUpdate(options)
+  }
+  private updateTask: Promise<void>
+  private cancelToken = { cancel: false }
+
+  private debounceUpdate = _.debounce(options => {
+    this.initViewer().then(async _ => {
+      if (this.updateTask) {
+        this.cancelToken.cancel = true
+        console.log("awaiting cancellation")
+        await this.updateTask
+        console.log("cancellation done")
+        this.cancelToken.cancel = false
+      }
       // Handle changes in the visual objects
       this.handleSettingsUpdate(options)
       // Handle the update in data passed to this visual
-      return this.handleDataUpdate(options)
+      this.updateTask = this.handleDataUpdate(options, this.cancelToken)
+      this.updateTask.then(() => (this.updateTask = undefined))
     })
-  }
+  }, 1000)
+
   private currentOrthoMode: boolean = undefined
   private currentDefaultView: string = undefined
-  private handleSettingsUpdate(options: VisualUpdateOptions) {
+
+  private async handleSettingsUpdate(options: VisualUpdateOptions) {
     // Handle change in ortho mode
     if (this.currentOrthoMode != this.settings.camera.orthoMode) {
       if (this.settings.camera.orthoMode)
@@ -137,7 +154,7 @@ export class Visual implements IVisual {
     this.target.style.backgroundColor = this.settings.color.background
   }
 
-  private handleDataUpdate(options: VisualUpdateOptions) {
+  private async handleDataUpdate(options: VisualUpdateOptions, { cancel }) {
     var categoricalView = options.dataViews[0].categorical
     var streamCategory = categoricalView?.categories[0].values
     var objectIdCategory = categoricalView?.categories[1].values
@@ -145,108 +162,113 @@ export class Visual implements IVisual {
       ? categoricalView?.values[0].highlights
       : null
 
-    console.log("Viewer loading:", options)
+    console.log("Viewer loading:", this.viewer, options)
     //@ts-ignore
     var selectionBuilder = this.host.createSelectionIdBuilder()
-
+    console.log(
+      "test data length",
+      streamCategory.length,
+      objectIdCategory.length
+    )
     var objectUrls = streamCategory.map((stream, index) => {
       var url = `${stream}/objects/${objectIdCategory[index]}`
       return url
     })
     var objectsToUnload = []
-    for (const key in this.selectionIdMap.keys()) {
-      if (!objectUrls.find(url => url.split("/").slice(-1).pop() == key)) {
+    for (const key of this.selectionIdMap.keys()) {
+      const found = objectUrls.find(url => url == key)
+      if (!found) {
         objectsToUnload.push(key)
       }
     }
+
     console.log(
       `Viewer loading ${objectUrls.length} and unloading ${objectsToUnload.length}`
     )
-    var unloadPromises = objectsToUnload.map(url => {
-      return this.viewer
-        .unloadObject(url)
+    if (cancel) return
+    for (const url of objectsToUnload) {
+      if (cancel) return
+      console.log("unloading object", url, this.viewer["loaders"][url])
+      await this.viewer
+        .cancelLoad(url, true)
         .then(_ => {
-          this.selectionIdMap.delete(url.split("/").slice(-1).pop())
+          this.selectionIdMap.delete(url)
         })
         .catch(e => console.warn("Viewer Unload error", url, e))
-    })
+    }
 
-    var loadPromises = objectUrls.map((url, index) => {
-      if (!this.selectionIdMap.has(url.split("/").slice(-1).pop())) {
+    var index = 0
+    for (const url of objectUrls) {
+      if (cancel) return
+      if (!this.selectionIdMap.has(url)) {
         var selectionId = selectionBuilder.withCategory(
           categoricalView?.categories[1].values[index]
         )
-        return this.viewer
+        await this.viewer
           .loadObject(url, null, false)
           .then(_ => {
-            this.selectionIdMap.set(
-              categoricalView?.categories[1].values[index].toString(),
-              selectionId
-            )
+            var url =
+              categoricalView?.categories[0].values[index].toString() +
+              "/objects/" +
+              categoricalView?.categories[1].values[index].toString()
+            this.selectionIdMap.set(url, selectionId)
           })
           .catch(e => {
             console.warn("Viewer Load error", url, e)
           })
       }
-    })
+      index++
+    }
 
-    var unloadRes = Promise.all(unloadPromises)
-    var loadRes = Promise.all(loadPromises)
-
-    return unloadRes
-      .then(_ => loadRes)
-      .then(_ => {
-        var colorList = this.settings.color.getColorList()
-        // Once everything is loaded, run the filter
-        var filter = null
-        if (categoricalView?.values) {
-          var name = categoricalView?.values[0].source.displayName
-          var isNum =
-            categoricalView?.values[0].source.type.numeric ||
-            categoricalView?.values[0].source.type.integer
-          var filterType = isNum ? "gradient" : "category"
-          console.log("filter:", filterType, name)
-          if (highlightedValues)
-            filter = {
-              filterBy: {
-                id: highlightedValues
-                  .map((value, index) =>
-                    value ? objectIdCategory[index] : null
-                  )
-                  .filter(e => e != null)
-              },
-              ghostOthers: true,
-              colorBy: {
-                type: filterType,
-                property: this.cleanupDataColumnName(name),
-                gradientColors: isNum ? colorList : undefined,
-                minValue: categoricalView?.values[0].minLocal,
-                maxValue: categoricalView?.values[0].maxLocal
-              }
-            }
-          else
-            filter = {
-              filterBy: {
-                id: objectIdCategory
-              },
-              colorBy: {
-                type: filterType,
-                property: this.cleanupDataColumnName(name),
-                gradientColors: isNum ? colorList : undefined,
-                minValue: categoricalView?.values[0].minLocal,
-                maxValue: categoricalView?.values[0].maxLocal
-              }
-            }
+    var colorList = this.settings.color.getColorList()
+    // Once everything is loaded, run the filter
+    var filter = null
+    if (categoricalView?.values) {
+      var name = categoricalView?.values[0].source.displayName
+      var isNum =
+        categoricalView?.values[0].source.type.numeric ||
+        categoricalView?.values[0].source.type.integer
+      var filterType = isNum ? "gradient" : "category"
+      console.log("filter:", filterType, name)
+      if (highlightedValues)
+        filter = {
+          filterBy: {
+            id: highlightedValues
+              .map((value, index) => (value ? objectIdCategory[index] : null))
+              .filter(e => e != null)
+          },
+          ghostOthers: true,
+          colorBy: {
+            type: filterType,
+            property: this.cleanupDataColumnName(name),
+            gradientColors: isNum ? colorList : undefined,
+            minValue: categoricalView?.values[0].minLocal,
+            maxValue: categoricalView?.values[0].maxLocal
+          }
         }
-        console.log("filter:", filter)
-        return this.viewer
-          .applyFilter(filter)
-          .catch(e => {
-            console.warn("Filter failed to be applied. Filter will be reset", e)
-            return this.viewer.applyFilter(null)
-          })
-          .then(_ => this.viewer.zoomExtents())
+      else
+        filter = {
+          filterBy: {
+            id: objectIdCategory
+          },
+          colorBy: {
+            type: filterType,
+            property: this.cleanupDataColumnName(name),
+            gradientColors: isNum ? colorList : undefined,
+            minValue: categoricalView?.values[0].minLocal,
+            maxValue: categoricalView?.values[0].maxLocal
+          }
+        }
+    }
+    console.log("filter:", filter)
+    if (cancel) return
+    return await this.viewer
+      .applyFilter(filter)
+      .catch(e => {
+        console.warn("Filter failed to be applied. Filter will be reset", e)
+        return this.viewer.applyFilter(null)
       })
+      .then(_ => this.viewer.zoomExtents())
   }
   private cleanupDataColumnName(name: string) {
     var cleanName = name

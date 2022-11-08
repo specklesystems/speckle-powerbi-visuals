@@ -16,6 +16,7 @@ import { SpeckleVisualSettings } from "./settings"
 import { Viewer, DefaultViewerParams } from "@speckle/viewer"
 import * as _ from "lodash"
 import { VisualUpdateTypeToString, cleanupDataColumnName } from "./utils"
+import { SettingsChangedType, Tracker } from "./mixpanel"
 export class Visual implements IVisual {
   private target: HTMLElement
   private settings: SpeckleVisualSettings
@@ -26,8 +27,8 @@ export class Visual implements IVisual {
 
   private updateTask: Promise<void>
   private ac = new AbortController()
-  private currentOrthoMode: boolean = undefined
-  private currentDefaultView: string = undefined
+  private currentOrthoMode: boolean = false
+  private currentDefaultView: string = "default"
 
   private debounceWait = 500
 
@@ -49,32 +50,8 @@ export class Visual implements IVisual {
     })
   }, this.debounceWait)
 
-  public async trackVisualCreate() {
-    return fetch("https://analytics.speckle.systems/track?ip=1", {
-      method: "POST",
-
-      headers: {
-        Accept: "text/plain"
-      },
-      body: JSON.stringify({
-        event: "create",
-        properties: {
-          server_id: "unknown",
-          token: "acd87c5a50b56df91a795e999812a3a4",
-          hostApp: "powerbi-visual"
-        }
-      })
-    })
-      .then(async res => {
-        console.log("Create track", res, await res.json())
-      })
-      .catch(r => {
-        console.error("Create track failed", r)
-      })
-  }
-
   constructor(options: VisualConstructorOptions) {
-    this.trackVisualCreate()
+    Tracker.loaded()
     this.host = options.host
 
     this.selectionIdMap = new Map<string, any>()
@@ -141,12 +118,14 @@ export class Visual implements IVisual {
         this.viewer?.cameraHandler?.setOrthoCameraOn()
       else this.viewer?.cameraHandler?.setPerspectiveCameraOn()
       this.currentOrthoMode = this.settings.camera.orthoMode
+      Tracker.settingsChanged(SettingsChangedType.OrthoMode)
     }
 
     // Handle change in default view
     if (this.currentDefaultView != this.settings.camera.defaultView) {
       this.viewer.interactions.rotateTo(this.settings.camera.defaultView)
       this.currentDefaultView = this.settings.camera.defaultView
+      Tracker.settingsChanged(SettingsChangedType.DefaultCamera)
     }
 
     // Update bg of viewer
@@ -262,7 +241,7 @@ export class Visual implements IVisual {
     }
 
     if (signal?.aborted) return
-
+    Tracker.dataReload()
     console.log("Applying filter:", filter)
     return await this.viewer
       .applyFilter(filter)

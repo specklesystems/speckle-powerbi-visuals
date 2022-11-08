@@ -152,6 +152,7 @@
         "https://*.speckle.xyz",
         "https://latest.speckle.dev",
         "https://*.speckle.dev",
+        "https://analytics.speckle.systems",
         "*"
       ]
     },

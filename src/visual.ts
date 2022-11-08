@@ -49,7 +49,32 @@ export class Visual implements IVisual {
     })
   }, this.debounceWait)
 
+  public async trackVisualCreate() {
+    return fetch("https://analytics.speckle.systems/track?ip=1", {
+      method: "POST",
+
+      headers: {
+        Accept: "text/plain"
+      },
+      body: JSON.stringify({
+        event: "create",
+        properties: {
+          server_id: "unknown",
+          token: "acd87c5a50b56df91a795e999812a3a4",
+          hostApp: "powerbi-visual"
+        }
+      })
+    })
+      .then(async res => {
+        console.log("Create track", res, await res.json())
+      })
+      .catch(r => {
+        console.error("Create track failed", r)
+      })
+  }
+
   constructor(options: VisualConstructorOptions) {
+    this.trackVisualCreate()
     this.host = options.host
 
     this.selectionIdMap = new Map<string, any>()

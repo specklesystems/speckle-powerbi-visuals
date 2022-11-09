@@ -42,7 +42,7 @@ export class Tracker {
             })
           )
       })
-      console.log("Create track", res, await res.json())
+      //console.log("Create track", res, await res.json())
     } catch (e) {
       console.error("Create track failed", e)
     }

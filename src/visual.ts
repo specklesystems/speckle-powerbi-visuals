@@ -137,15 +137,21 @@ export class Visual implements IVisual {
     signal: AbortSignal
   ) {
     var categoricalView = options.dataViews[0].categorical
-    var streamCategory = categoricalView?.categories[0].values
-    var objectIdCategory = categoricalView?.categories[1].values
+    var streamCategory = categoricalView?.categories[0]?.values
+    var objectIdCategory = categoricalView?.categories[1]?.values
     var highlightedValues = categoricalView?.values
       ? categoricalView?.values[0].highlights
       : null
-    if (streamCategory == undefined || objectIdCategory == undefined) {
+    if (!streamCategory || !objectIdCategory) {
       // If some of the fields are not filled in, unload everything
-      return await this.viewer.unloadAll()
+      console.warn(
+        `Incomplete data input. "Stream URL" and "Object ID" data inputs are mandatory`
+      )
+      await this.viewer.unloadAll()
+      this.selectionIdMap = new Map<string, any>()
+      return
     }
+
     //@ts-ignore
     var selectionBuilder = this.host.createSelectionIdBuilder()
 
@@ -153,6 +159,7 @@ export class Visual implements IVisual {
       var url = `${stream}/objects/${objectIdCategory[index]}`
       return url
     })
+
     var objectsToUnload = []
     for (const key of this.selectionIdMap.keys()) {
       const found = objectUrls.find(url => url == key)
@@ -201,9 +208,7 @@ export class Visual implements IVisual {
     var colorList = this.settings.color.getColorList()
     // Once everything is loaded, run the filter
     var filter = null
-    console.log("categorical view", categoricalView)
     if (categoricalView?.values) {
-      console.log("values exist?")
       var name = categoricalView?.values[0].source.displayName
       var isNum =
         categoricalView?.values[0].source.type.numeric ||

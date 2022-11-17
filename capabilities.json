@@ -31,15 +31,15 @@
                 "in": "object"
               }
             }
-          ]
-        },
-        "values": {
-          "for": { "in": "objectData" },
+          ],
           "dataReductionAlgorithm": {
             "top": {
               "count": 30000
             }
           }
+        },
+        "values": {
+          "for": { "in": "objectData" }
         }
       }
     }

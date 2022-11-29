@@ -4,6 +4,7 @@ import "core-js/stable"
 import "regenerator-runtime/runtime" /* <---- add this line */
 import "./../style/visual.less"
 import powerbi from "powerbi-visuals-api"
+
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
 import IVisual = powerbi.extensibility.visual.IVisual
@@ -13,10 +14,11 @@ import DataView = powerbi.DataView
 import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject
 
 import { SpeckleVisualSettings } from "./settings"
-import { Viewer, DefaultViewerParams } from "@speckle/viewer"
+import { Viewer, DefaultViewerParams, CanonicalView } from "@speckle/viewer"
 import * as _ from "lodash"
 import { VisualUpdateTypeToString, cleanupDataColumnName } from "./utils"
 import { SettingsChangedType, Tracker } from "./mixpanel"
+
 export class Visual implements IVisual {
   private target: HTMLElement
   private settings: SpeckleVisualSettings
@@ -31,7 +33,6 @@ export class Visual implements IVisual {
   private currentDefaultView: string = "default"
 
   private debounceWait = 500
-
   private debounceUpdate = _.debounce(options => {
     this.initViewer().then(async _ => {
       if (this.updateTask) {
@@ -62,9 +63,7 @@ export class Visual implements IVisual {
   }
 
   public async initViewer() {
-    if (this.viewer) {
-      return
-    }
+    if (this.viewer) return
 
     var container = this.target.appendChild(document.createElement("div"))
     container.style.backgroundColor = "transparent"
@@ -72,9 +71,7 @@ export class Visual implements IVisual {
     container.style.width = "100%"
     container.style.position = "fixed"
 
-    const params = DefaultViewerParams
-
-    const viewer = new Viewer(container, params)
+    const viewer = new Viewer(container)
     await viewer.init()
 
     // Setup any events here (progress, load-complete...)
@@ -123,7 +120,7 @@ export class Visual implements IVisual {
 
     // Handle change in default view
     if (this.currentDefaultView != this.settings.camera.defaultView) {
-      this.viewer.interactions.rotateTo(this.settings.camera.defaultView)
+      this.viewer.setView(this.settings.camera.defaultView as CanonicalView)
       this.currentDefaultView = this.settings.camera.defaultView
       Tracker.settingsChanged(SettingsChangedType.DefaultCamera)
     }
@@ -244,17 +241,22 @@ export class Visual implements IVisual {
           }
         }
     }
-
     if (signal?.aborted) return
     Tracker.dataReload()
     console.log("Applying filter:", filter)
+    var prop = this.viewer
+      .getObjectProperties(null, true)
+      .find(item => item.key == cleanupDataColumnName(name))
+    if (filter == null) return await this.viewer.removeColorFilter()
+
+    console.log("Props", prop)
     return await this.viewer
-      .applyFilter(filter)
-      .catch(e => {
+      .setColorFilter(prop)
+      .catch(async e => {
         console.warn("Filter failed to be applied. Filter will be reset", e)
-        return this.viewer.applyFilter(null)
+        return await this.viewer.removeColorFilter()
       })
-      .then(_ => this.viewer.zoomExtents())
+      .then(_ => this.viewer.zoom())
   }
 
   private static parseSettings(dataView: DataView): SpeckleVisualSettings {

@@ -9,7 +9,7 @@
     "supportUrl": "https://speckle.community",
     "gitHubUrl": "https://github.com/specklesystems/speckle-powerbi-visuals"
   },
-  "apiVersion": "4.7.0",
+  "apiVersion": "5.1.0",
   "author": { "name": "Speckle Systems", "email": "info@speckle.systems" },
   "assets": { "icon": "assets/logo.png" },
   "externalJS": null,

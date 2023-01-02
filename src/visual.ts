@@ -141,6 +141,11 @@ export class Visual implements IVisual {
       : null
     if (!streamCategory || !objectIdCategory) {
       // If some of the fields are not filled in, unload everything
+      //@ts-ignore
+      this.host.displayWarningIcon(
+        `Incomplete data input.`,
+        `"Stream URL" and "Object ID" data inputs are mandatory`
+      )
       console.warn(
         `Incomplete data input. "Stream URL" and "Object ID" data inputs are mandatory`
       )
@@ -197,6 +202,16 @@ export class Visual implements IVisual {
           })
           .catch(e => {
             console.warn("Viewer Load error", url, e)
+            //@ts-ignore
+            this.host.displayWarningIcon(
+              "Load error",
+              `One or more objects could not be loaded
+              
+              Please ensure that the stream you're trying to access is PUBLIC
+              
+              The Speckle PowerBI Viewer cannot handle private streams yet.`
+            )
+            console.warn("Viewer Load error XX", url, e.name)
           })
       }
       index++

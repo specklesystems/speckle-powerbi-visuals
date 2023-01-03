@@ -7,6 +7,7 @@ import powerbi from "powerbi-visuals-api"
 
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
+import ITooltipService = powerbi.extensibility.ITooltipService
 import IVisual = powerbi.extensibility.visual.IVisual
 import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInstancesOptions
 import VisualObjectInstance = powerbi.VisualObjectInstance
@@ -14,7 +15,12 @@ import DataView = powerbi.DataView
 import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject
 
 import { SpeckleVisualSettings } from "./settings"
-import { Viewer, DefaultViewerParams, CanonicalView } from "@speckle/viewer"
+import {
+  Viewer,
+  CanonicalView,
+  ViewerEvent,
+  ObjectPredicate
+} from "@speckle/viewer"
 import * as _ from "lodash"
 import { VisualUpdateTypeToString, cleanupDataColumnName } from "./utils"
 import { SettingsChangedType, Tracker } from "./mixpanel"
@@ -24,6 +30,8 @@ export class Visual implements IVisual {
   private settings: SpeckleVisualSettings
   private host: powerbi.extensibility.IVisualHost
   private selectionManager: powerbi.extensibility.ISelectionManager
+  private tooltipService: ITooltipService
+
   private selectionIdMap: Map<string, any>
   private viewer: Viewer
 
@@ -51,6 +59,22 @@ export class Visual implements IVisual {
     })
   }, this.debounceWait)
 
+  private throttleCameraWait = 100
+  private throttleCameraUpdate = _.throttle(options => {
+    console.log("Camera updated")
+    if (!this.currentTooltip) return
+    var newScreenLoc = this.projectToScreen(
+      //@ts-ignore
+      this.currentTooltip.worldPos.clone()
+    )
+    var newTooltip = {
+      ...this.currentTooltip.tooltip,
+      coordinates: [newScreenLoc.x, newScreenLoc.y]
+    }
+    this.tooltipService.move(newTooltip)
+    this.currentTooltip.tooltip = newTooltip
+  }, this.throttleCameraWait)
+
   constructor(options: VisualConstructorOptions) {
     Tracker.loaded()
     this.host = options.host
@@ -58,7 +82,10 @@ export class Visual implements IVisual {
     this.selectionIdMap = new Map<string, any>()
     //@ts-ignore
     this.selectionManager = this.host.createSelectionManager()
-
+    //@ts-ignore
+    console.log("tooltip service", this.host.tooltipService)
+    //@ts-ignore
+    this.tooltipService = this.host.tooltipService as ITooltipService
     this.target = options.element
   }
 
@@ -75,8 +102,86 @@ export class Visual implements IVisual {
     await viewer.init()
 
     // Setup any events here (progress, load-complete...)
+    viewer.on(ViewerEvent.ObjectClicked, arg => {
+      console.log("object clicked", arg)
+      if (!arg) {
+        this.tooltipService.hide({ immediately: true, isTouchEvent: false })
+        this.currentTooltip = null
+        this.viewer.resetSelection()
+        this.selectionManager.clear()
+        return
+      }
+      var hit = arg.hits[0]
+      console.log("hit", hit)
+      var loc = hit.point
+      var selectionId = this.selectionIdMap.get(
+        hit.guid
+      ) as powerbi.extensibility.ISelectionId
+      const screenLoc = this.projectToScreen(loc)
+      console.log("viewer selected something", arg, selectionId)
+      this.viewer.selectObjects([hit.object.id])
+      var dataItems = Object.keys(hit.object)
+        .filter(key => !key.startsWith("__"))
+        .map(key => {
+          return {
+            displayName: key,
+            value: hit.object[key]
+          }
+        })
+
+      const tooltipData = {
+        coordinates: [screenLoc.x, screenLoc.y],
+        dataItems: dataItems,
+        identities: [selectionId],
+        isTouchEvent: false
+      }
+      this.tooltipService.show(tooltipData)
+      this.currentTooltip = {
+        id: hit.object.id,
+        worldPos: loc,
+        screenPos: screenLoc,
+        tooltip: tooltipData
+      }
+      this.selectionManager.select(selectionId, false).then(ids => {
+        console.log("select result", ids)
+      })
+    })
+    viewer.on(ViewerEvent.ObjectDoubleClicked, arg => {
+      if (!arg) return
+      console.log("object double-clicked", arg)
+
+      var hit = arg.hits[0]
+      var loc = hit.point
+      var selectionId = this.selectionIdMap.get(hit.guid)
+      const screenLoc = this.projectToScreen(loc)
+      console.log("selectionID", selectionId)
+      this.selectionManager.showContextMenu(selectionId, screenLoc)
+    })
+
+    viewer.cameraHandler.controls.addEventListener(
+      "update",
+      this.throttleCameraUpdate
+    )
 
     this.viewer = viewer
+  }
+
+  private currentTooltip: {
+    worldPos: { x: number; y: number; z: number }
+    screenPos: { x: number; y: number }
+    tooltip: any
+    id: string
+  } = null
+
+  private projectToScreen(loc: any) {
+    const cam = this.viewer.cameraHandler.camera
+    cam.updateProjectionMatrix()
+    loc.project(cam)
+    const screenLoc = {
+      x: (loc.x * 0.5 + 0.5) * window.innerWidth,
+      y: (loc.y * -0.5 + 0.5) * window.innerHeight
+    }
+    return screenLoc
   }
 
   public update(options: VisualUpdateOptions) {
@@ -154,9 +259,6 @@ export class Visual implements IVisual {
       return
     }
 
-    //@ts-ignore
-    var selectionBuilder = this.host.createSelectionIdBuilder()
-
     var objectUrls = streamCategory.map((stream, index) => {
       var url = `${stream}/objects/${objectIdCategory[index]}`
       return url
@@ -188,27 +290,32 @@ export class Visual implements IVisual {
     for (const url of objectUrls) {
       if (signal?.aborted) return
       if (!this.selectionIdMap.has(url)) {
-        var selectionId = selectionBuilder.withCategory(
+        console.log(
+          "creating objCategory",
           categoricalView?.categories[1].values[index]
+        )
+        //@ts-ignore
+        var selectionBuilder = this.host.createSelectionIdBuilder()
+        var selectionId = selectionBuilder
+          .withCategory(categoricalView?.categories[1], index)
+          .createSelectionId()
+        console.log(
+          "creating objCategory",
+          categoricalView?.categories[1],
+          selectionId
         )
         await this.viewer
           .loadObject(url, null, false)
           .then(_ => {
-            var url =
-              categoricalView?.categories[0].values[index].toString() +
-              "/objects/" +
-              categoricalView?.categories[1].values[index].toString()
             this.selectionIdMap.set(url, selectionId)
+            console.log("set selection id to map", url, selectionId)
           })
-          .catch(e => {
-            console.warn("Viewer Load error", url, e)
+          .catch((e: Error) => {
             //@ts-ignore
             this.host.displayWarningIcon(
               "Load error",
               `One or more objects could not be loaded
-              
               Please ensure that the stream you're trying to access is PUBLIC
-              
               The Speckle PowerBI Viewer cannot handle private streams yet.`
             )
             console.warn("Viewer Load error XX", url, e.name)
@@ -220,58 +327,38 @@ export class Visual implements IVisual {
     var colorList = this.settings.color.getColorList()
     // Once everything is loaded, run the filter
     var filter = null
-    if (categoricalView?.values) {
-      var name = categoricalView?.values[0].source.displayName
-      var isNum =
-        categoricalView?.values[0].source.type.numeric ||
-        categoricalView?.values[0].source.type.integer
-      var filterType = isNum ? "gradient" : "category"
-      if (highlightedValues)
-        filter = {
-          filterBy: {
-            id: highlightedValues
-              .map((value, index) => (value ? objectIdCategory[index] : null))
-              .filter(e => e != null)
-          },
-          ghostOthers: true,
-          colorBy: {
-            type: filterType,
-            property: cleanupDataColumnName(name),
-            gradientColors: isNum ? colorList : undefined,
-            minValue: categoricalView?.values[0].minLocal,
-            maxValue: categoricalView?.values[0].maxLocal
-          }
-        }
-      else
-        filter = {
-          filterBy: {
-            id: objectIdCategory
-          },
-          colorBy: {
-            type: filterType,
-            property: cleanupDataColumnName(name),
-            gradientColors: isNum ? colorList : undefined,
-            minValue: categoricalView?.values[0].minLocal,
-            maxValue: categoricalView?.values[0].maxLocal
-          }
-        }
-    }
+    var name = null
+
     if (signal?.aborted) return
     Tracker.dataReload()
     console.log("Applying filter:", filter)
-    var prop = this.viewer
-      .getObjectProperties(null, true)
-      .find(item => item.key == cleanupDataColumnName(name))
-    if (filter == null) return await this.viewer.removeColorFilter()
-
-    console.log("Props", prop)
-    return await this.viewer
-      .setColorFilter(prop)
-      .catch(async e => {
+    if (categoricalView?.values) {
+      name = categoricalView?.values[0].source.displayName
+      var objectIds = highlightedValues
+        ? highlightedValues
+            .map((value, index) =>
+              value ? objectIdCategory[index].toString() : null
+            )
+            .filter(e => e != null)
+        : null
+      if (objectIds) {
+        await this.viewer.resetFilters()
+        await this.viewer.isolateObjects(objectIds, null, true, true)
+      } else {
+        await this.viewer.resetFilters()
+      }
+      var prop = this.viewer
+        .getObjectProperties(null, true)
+        .find(item => item.key == cleanupDataColumnName(name))
+      var state = await this.viewer.setColorFilter(prop).catch(async e => {
         console.warn("Filter failed to be applied. Filter will be reset", e)
         return await this.viewer.removeColorFilter()
       })
-      .then(_ => this.viewer.zoom())
+    } else {
+      await this.viewer.resetFilters()
+    }
+
+    this.viewer.zoom()
   }
 
   private static parseSettings(dataView: DataView): SpeckleVisualSettings {

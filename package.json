@@ -20,6 +20,8 @@
     "lodash": "^4.17.21",
     "powerbi-visuals-api": "~5.1.0",
     "powerbi-visuals-utils-dataviewutils": "2.4.1",
+    "powerbi-visuals-utils-interactivityutils": "^5.7.1",
+    "powerbi-visuals-utils-tooltiputils": "^2.5.2",
     "regenerator-runtime": "^0.13.9"
   },
   "devDependencies": {

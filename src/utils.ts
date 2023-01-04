@@ -49,3 +49,13 @@ export function cleanupDataColumnName(name: string) {
   if (cleanName.startsWith("data.")) cleanName = cleanName.split("data.")[0]
   return cleanName
 }
+
+export function projectToScreen(cam: any, loc: any) {
+  cam.updateProjectionMatrix()
+  var copy = loc.clone()
+  copy.project(cam)
+  return {
+    x: (copy.x * 0.5 + 0.5) * window.innerWidth,
+    y: (copy.y * -0.5 + 0.5) * window.innerHeight
+  }
+}

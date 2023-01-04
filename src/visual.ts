@@ -22,8 +22,13 @@ import {
   ObjectPredicate
 } from "@speckle/viewer"
 import * as _ from "lodash"
-import { VisualUpdateTypeToString, cleanupDataColumnName } from "./utils"
+import {
+  VisualUpdateTypeToString,
+  cleanupDataColumnName,
+  projectToScreen
+} from "./utils"
 import { SettingsChangedType, Tracker } from "./mixpanel"
+import { throttle } from "lodash"
 
 export class Visual implements IVisual {
   private target: HTMLElement
@@ -32,7 +37,7 @@ export class Visual implements IVisual {
   private selectionManager: powerbi.extensibility.ISelectionManager
   private tooltipService: ITooltipService
 
-  private selectionIdMap: Map<string, any>
+  private selectionIdMap: Map<string, powerbi.extensibility.ISelectionId>
   private viewer: Viewer
 
   private updateTask: Promise<void>
@@ -40,7 +45,13 @@ export class Visual implements IVisual {
   private currentOrthoMode: boolean = false
   private currentDefaultView: string = "default"
 
-  private debounceWait = 500
+  private currentTooltip: {
+    worldPos: { x: number; y: number; z: number }
+    screenPos: { x: number; y: number }
+    tooltip: any
+    id: string
+  } = null
+
   private debounceUpdate = _.debounce(options => {
     this.initViewer().then(async _ => {
       if (this.updateTask) {
@@ -57,23 +68,18 @@ export class Visual implements IVisual {
         () => (this.updateTask = undefined)
       )
     })
-  }, this.debounceWait)
+  }, 500)
 
-  private throttleCameraWait = 100
   private throttleCameraUpdate = _.throttle(options => {
-    console.log("Camera updated")
+    console.log("Camera updated", this.currentTooltip)
     if (!this.currentTooltip) return
-    var newScreenLoc = this.projectToScreen(
-      //@ts-ignore
-      this.currentTooltip.worldPos.clone()
+    var newScreenLoc = projectToScreen(
+      this.viewer.cameraHandler.camera,
+      this.currentTooltip.worldPos
     )
-    var newTooltip = {
-      ...this.currentTooltip.tooltip,
-      coordinates: [newScreenLoc.x, newScreenLoc.y]
-    }
-    this.tooltipService.move(newTooltip)
-    this.currentTooltip.tooltip = newTooltip
-  }, this.throttleCameraWait)
+    this.currentTooltip.tooltip.coordinates = [newScreenLoc.x, newScreenLoc.y]
+    this.tooltipService.move(this.currentTooltip.tooltip)
+  }, 100)
 
   constructor(options: VisualConstructorOptions) {
     Tracker.loaded()
@@ -111,50 +117,22 @@ export class Visual implements IVisual {
         this.selectionManager.clear()
         return
       }
-      var hit = arg.hits[0]
-      console.log("hit", hit)
-      var loc = hit.point
-      var selectionId = this.selectionIdMap.get(
-        hit.guid
-      ) as powerbi.extensibility.ISelectionId
-      const screenLoc = this.projectToScreen(loc)
-      console.log("viewer selected something", arg, selectionId)
-      this.viewer.selectObjects([hit.object.id])
-      var dataItems = Object.keys(hit.object)
-        .filter(key => !key.startsWith("__"))
-        .map(key => {
-          return {
-            displayName: key,
-            value: hit.object[key]
-          }
-        })
 
-      const tooltipData = {
-        coordinates: [screenLoc.x, screenLoc.y],
-        dataItems: dataItems,
-        identities: [selectionId],
-        isTouchEvent: false
-      }
-      this.tooltipService.show(tooltipData)
-      this.currentTooltip = {
-        id: hit.object.id,
-        worldPos: loc,
-        screenPos: screenLoc,
-        tooltip: tooltipData
-      }
-      this.selectionManager.select(selectionId, false).then(ids => {
-        console.log("select result", ids)
-      })
+      var hit = arg.hits[0]
+      console.log("viewer is about to select something", arg)
+      this.viewer.selectObjects([hit.object.id])
+
+      this.showTooltip(hit)
+      this.selectionManager.select(this.selectionIdMap.get(hit.guid), false)
     })
     viewer.on(ViewerEvent.ObjectDoubleClicked, arg => {
       if (!arg) return
-      console.log("object double-clicked", arg)
-
       var hit = arg.hits[0]
-      var loc = hit.point
       var selectionId = this.selectionIdMap.get(hit.guid)
-      const screenLoc = this.projectToScreen(loc)
-      console.log("selectionID", selectionId)
+      const screenLoc = projectToScreen(
+        this.viewer.cameraHandler.camera,
+        hit.point
+      )
       this.selectionManager.showContextMenu(selectionId, screenLoc)
     })
 
@@ -166,22 +144,35 @@ export class Visual implements IVisual {
     this.viewer = viewer
   }
 
-  private currentTooltip: {
-    worldPos: { x: number; y: number; z: number }
-    screenPos: { x: number; y: number }
-    tooltip: any
-    id: string
-  } = null
+  private showTooltip(hit: any) {
+    var selectionId = this.selectionIdMap.get(hit.guid)
+    const screenLoc = projectToScreen(
+      this.viewer.cameraHandler.camera,
+      hit.point
+    )
+    var dataItems = Object.keys(hit.object)
+      .filter(key => !key.startsWith("__"))
+      .map(key => {
+        return {
+          displayName: key,
+          value: hit.object[key]
+        }
+      })
 
-  private projectToScreen(loc: any) {
-    const cam = this.viewer.cameraHandler.camera
-    cam.updateProjectionMatrix()
-    loc.project(cam)
-    const screenLoc = {
-      x: (loc.x * 0.5 + 0.5) * window.innerWidth,
-      y: (loc.y * -0.5 + 0.5) * window.innerHeight
+    const tooltipData = {
+      coordinates: [screenLoc.x, screenLoc.y],
+      dataItems: dataItems,
+      identities: [selectionId],
+      isTouchEvent: false
     }
-    return screenLoc
+
+    this.currentTooltip = {
+      id: hit.object.id,
+      worldPos: hit.point,
+      screenPos: screenLoc,
+      tooltip: tooltipData
+    }
+    this.tooltipService.show(tooltipData)
   }
 
   public update(options: VisualUpdateOptions) {
@@ -289,38 +280,25 @@ export class Visual implements IVisual {
     var index = 0
     for (const url of objectUrls) {
       if (signal?.aborted) return
-      if (!this.selectionIdMap.has(url)) {
-        console.log(
-          "creating objCategory",
-          categoricalView?.categories[1].values[index]
-        )
-        //@ts-ignore
-        var selectionBuilder = this.host.createSelectionIdBuilder()
-        var selectionId = selectionBuilder
-          .withCategory(categoricalView?.categories[1], index)
-          .createSelectionId()
-        console.log(
-          "creating objCategory",
-          categoricalView?.categories[1],
-          selectionId
-        )
-        await this.viewer
-          .loadObject(url, null, false)
-          .then(_ => {
-            this.selectionIdMap.set(url, selectionId)
-            console.log("set selection id to map", url, selectionId)
-          })
-          .catch((e: Error) => {
-            //@ts-ignore
-            this.host.displayWarningIcon(
-              "Load error",
-              `One or more objects could not be loaded
+      if (!this.selectionIdMap.has(url))
+        await this.viewer.loadObject(url, null, false).catch((e: Error) => {
+          //@ts-ignore
+          this.host.displayWarningIcon(
+            "Load error",
+            `One or more objects could not be loaded
               Please ensure that the stream you're trying to access is PUBLIC
               The Speckle PowerBI Viewer cannot handle private streams yet.`
-            )
-            console.warn("Viewer Load error XX", url, e.name)
-          })
-      }
+          )
+          console.warn("Viewer Load error XX", url, e.name)
+        })
+
+      //@ts-ignore
+      var selectionBuilder = this.host.createSelectionIdBuilder()
+      var selectionId = selectionBuilder
+        .withCategory(categoricalView?.categories[1], index)
+        .createSelectionId()
+      this.selectionIdMap.set(url, selectionId)
+
       index++
     }
 

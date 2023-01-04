@@ -4,7 +4,6 @@ import "core-js/stable"
 import "regenerator-runtime/runtime" /* <---- add this line */
 import "./../style/visual.less"
 import powerbi from "powerbi-visuals-api"
-
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
 import ITooltipService = powerbi.extensibility.ITooltipService
@@ -30,6 +29,20 @@ import {
 import { SettingsChangedType, Tracker } from "./mixpanel"
 import { throttle } from "lodash"
 
+interface SpeckleTooltip {
+  worldPos: {
+    x: number
+    y: number
+    z: number
+  }
+  screenPos: {
+    x: number
+    y: number
+  }
+  tooltip: any
+  id: string
+}
+
 export class Visual implements IVisual {
   private target: HTMLElement
   private settings: SpeckleVisualSettings
@@ -44,52 +57,14 @@ export class Visual implements IVisual {
   private ac = new AbortController()
   private currentOrthoMode: boolean = false
   private currentDefaultView: string = "default"
-
-  private currentTooltip: {
-    worldPos: { x: number; y: number; z: number }
-    screenPos: { x: number; y: number }
-    tooltip: any
-    id: string
-  } = null
-
-  private debounceUpdate = _.debounce(options => {
-    this.initViewer().then(async _ => {
-      if (this.updateTask) {
-        this.ac.abort()
-        console.log("Cancelling previous load job")
-        await this.updateTask
-        this.ac = new AbortController()
-      }
-      // Handle changes in the visual objects
-      this.handleSettingsUpdate(options)
-      console.log("Updating viewer with new data")
-      // Handle the update in data passed to this visual
-      this.updateTask = this.handleDataUpdate(options, this.ac.signal).then(
-        () => (this.updateTask = undefined)
-      )
-    })
-  }, 500)
-
-  private throttleCameraUpdate = _.throttle(options => {
-    console.log("Camera updated", this.currentTooltip)
-    if (!this.currentTooltip) return
-    var newScreenLoc = projectToScreen(
-      this.viewer.cameraHandler.camera,
-      this.currentTooltip.worldPos
-    )
-    this.currentTooltip.tooltip.coordinates = [newScreenLoc.x, newScreenLoc.y]
-    this.tooltipService.move(this.currentTooltip.tooltip)
-  }, 100)
+  private currentTooltip: SpeckleTooltip = null
 
   constructor(options: VisualConstructorOptions) {
     Tracker.loaded()
     this.host = options.host
-
-    this.selectionIdMap = new Map<string, any>()
+    this.selectionIdMap = new Map<string, powerbi.extensibility.ISelectionId>()
     //@ts-ignore
     this.selectionManager = this.host.createSelectionManager()
-    //@ts-ignore
-    console.log("tooltip service", this.host.tooltipService)
     //@ts-ignore
     this.tooltipService = this.host.tooltipService as ITooltipService
     this.target = options.element
@@ -98,81 +73,19 @@ export class Visual implements IVisual {
   public async initViewer() {
     if (this.viewer) return
 
-    var container = this.target.appendChild(document.createElement("div"))
-    container.style.backgroundColor = "transparent"
-    container.style.height = "100%"
-    container.style.width = "100%"
-    container.style.position = "fixed"
-
+    var container = this.createContainerDiv()
     const viewer = new Viewer(container)
     await viewer.init()
 
     // Setup any events here (progress, load-complete...)
-    viewer.on(ViewerEvent.ObjectClicked, arg => {
-      console.log("object clicked", arg)
-      if (!arg) {
-        this.tooltipService.hide({ immediately: true, isTouchEvent: false })
-        this.currentTooltip = null
-        this.viewer.resetSelection()
-        this.selectionManager.clear()
-        return
-      }
-
-      var hit = arg.hits[0]
-      console.log("viewer is about to select something", arg)
-      this.viewer.selectObjects([hit.object.id])
-
-      this.showTooltip(hit)
-      this.selectionManager.select(this.selectionIdMap.get(hit.guid), false)
-    })
-    viewer.on(ViewerEvent.ObjectDoubleClicked, arg => {
-      if (!arg) return
-      var hit = arg.hits[0]
-      var selectionId = this.selectionIdMap.get(hit.guid)
-      const screenLoc = projectToScreen(
-        this.viewer.cameraHandler.camera,
-        hit.point
-      )
-      this.selectionManager.showContextMenu(selectionId, screenLoc)
-    })
-
+    viewer.on(ViewerEvent.ObjectClicked, this.onObjectClicked)
+    viewer.on(ViewerEvent.ObjectDoubleClicked, this.onObjectDoubleClicked)
     viewer.cameraHandler.controls.addEventListener(
       "update",
       this.throttleCameraUpdate
     )
 
     this.viewer = viewer
-  }
-
-  private showTooltip(hit: any) {
-    var selectionId = this.selectionIdMap.get(hit.guid)
-    const screenLoc = projectToScreen(
-      this.viewer.cameraHandler.camera,
-      hit.point
-    )
-    var dataItems = Object.keys(hit.object)
-      .filter(key => !key.startsWith("__"))
-      .map(key => {
-        return {
-          displayName: key,
-          value: hit.object[key]
-        }
-      })
-
-    const tooltipData = {
-      coordinates: [screenLoc.x, screenLoc.y],
-      dataItems: dataItems,
-      identities: [selectionId],
-      isTouchEvent: false
-    }
-
-    this.currentTooltip = {
-      id: hit.object.id,
-      worldPos: hit.point,
-      screenPos: screenLoc,
-      tooltip: tooltipData
-    }
-    this.tooltipService.show(tooltipData)
   }
 
   public update(options: VisualUpdateOptions) {
@@ -355,5 +268,102 @@ export class Visual implements IVisual {
       this.settings || SpeckleVisualSettings.getDefault(),
       options
     )
+  }
+
+  private debounceUpdate = _.debounce(options => {
+    this.initViewer().then(async _ => {
+      if (this.updateTask) {
+        this.ac.abort()
+        console.log("Cancelling previous load job")
+        await this.updateTask
+        this.ac = new AbortController()
+      }
+      // Handle changes in the visual objects
+      this.handleSettingsUpdate(options)
+      console.log("Updating viewer with new data")
+      // Handle the update in data passed to this visual
+      this.updateTask = this.handleDataUpdate(options, this.ac.signal).then(
+        () => (this.updateTask = undefined)
+      )
+    })
+  }, 500)
+
+  private throttleCameraUpdate = _.throttle(options => {
+    console.log("Camera updated", this.currentTooltip)
+    if (!this.currentTooltip) return
+    var newScreenLoc = projectToScreen(
+      this.viewer.cameraHandler.camera,
+      this.currentTooltip.worldPos
+    )
+    this.currentTooltip.tooltip.coordinates = [newScreenLoc.x, newScreenLoc.y]
+    this.tooltipService.move(this.currentTooltip.tooltip)
+  }, 100)
+
+  private onObjectClicked = arg => {
+    console.log("object clicked", arg)
+    if (!arg) {
+      this.tooltipService.hide({ immediately: true, isTouchEvent: false })
+      this.currentTooltip = null
+      this.viewer.resetSelection()
+      this.selectionManager.clear()
+      return
+    }
+
+    var hit = arg.hits[0]
+    this.viewer.selectObjects([hit.object.id])
+
+    this.showTooltip(hit)
+    this.selectionManager.select(this.selectionIdMap.get(hit.guid), false)
+  }
+
+  private onObjectDoubleClicked = arg => {
+    if (!arg) return
+    var hit = arg.hits[0]
+    var selectionId = this.selectionIdMap.get(hit.guid)
+    const screenLoc = projectToScreen(
+      this.viewer.cameraHandler.camera,
+      hit.point
+    )
+    this.selectionManager.showContextMenu(selectionId, screenLoc)
+  }
+
+  private createContainerDiv() {
+    var container = this.target.appendChild(document.createElement("div"))
+    container.style.backgroundColor = "transparent"
+    container.style.height = "100%"
+    container.style.width = "100%"
+    container.style.position = "fixed"
+    return container
+  }
+
+  private showTooltip(hit: any) {
+    var selectionId = this.selectionIdMap.get(hit.guid)
+    const screenLoc = projectToScreen(
+      this.viewer.cameraHandler.camera,
+      hit.point
+    )
+    var dataItems = Object.keys(hit.object)
+      .filter(key => !key.startsWith("__"))
+      .map(key => {
+        return {
+          displayName: key,
+          value: hit.object[key]
+        }
+      })
+
+    const tooltipData = {
+      coordinates: [screenLoc.x, screenLoc.y],
+      dataItems: dataItems,
+      identities: [selectionId],
+      isTouchEvent: false
+    }
+
+    this.currentTooltip = {
+      id: hit.object.id,
+      worldPos: hit.point,
+      screenPos: screenLoc,
+      tooltip: tooltipData
+    }
+    this.tooltipService.show(tooltipData)
   }
 }

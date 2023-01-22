@@ -48,6 +48,8 @@
   "supportsMultiVisualSelection": true,
   "suppressDefaultTitle": true,
   "supportsSynchronizingFilterState": true,
+  "supportsLandingPage": true,
+  "supportsEmptyDataView": true,
   "supportsKeyboardFocus": true,
   "tooltips": {
     "supportEnhancedTooltips": true

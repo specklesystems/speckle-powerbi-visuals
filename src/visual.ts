@@ -96,6 +96,8 @@ export class Visual implements IVisual {
       options && options.dataViews && options.dataViews[0]
     )
 
+    this.HandleLandingPage(options)
+    if (this.isLandingPageOn) return
     console.log(
       `Update was called with update type ${VisualUpdateTypeToString(
         options.type
@@ -213,7 +215,6 @@ export class Visual implements IVisual {
         .withCategory(categoricalView?.categories[1], index)
         .createSelectionId()
       this.selectionIdMap.set(url, selectionId)
-
       index++
     }
 
@@ -221,7 +222,6 @@ export class Visual implements IVisual {
     Tracker.dataReload()
 
     var colorList = this.settings.color.getColorList()
-
     if (categoricalView?.values) {
       var name = categoricalView?.values[0].source.displayName
       var objectIds = highlightedValues
@@ -241,8 +241,6 @@ export class Visual implements IVisual {
         .getObjectProperties(null, true)
         .find(item => item.key == cleanupDataColumnName(name))
 
-      console.log("Prop found", prop)
-
       if (prop.type == "number") {
         var groups = this.getCustomColorGroups(prop, colorList)
         //@ts-ignore
@@ -257,7 +255,7 @@ export class Visual implements IVisual {
       await this.viewer.resetFilters()
     }
 
-    this.viewer.zoom()
+    //this.viewer.zoom()
   }
 
   private static parseSettings(dataView: DataView): SpeckleVisualSettings {
@@ -371,6 +369,74 @@ export class Visual implements IVisual {
       tooltip: tooltipData
     }
     this.tooltipService.show(tooltipData)
+  }
+
+  private isLandingPageOn = false
+  private LandingPageRemoved = false
+
+  private LandingPage: Element = null
+
+  private HandleLandingPage(options: VisualUpdateOptions) {
+    console.log("handle landing page")
+    if (
+      !options.dataViews ||
+      !options.dataViews[0]?.metadata?.columns?.length
+    ) {
+      if (!this.isLandingPageOn) {
+        this.isLandingPageOn = true
+        const SampleLandingPage: Element = this.createSampleLandingPage() //create a landing page
+        this.LandingPage = SampleLandingPage
+      }
+    } else {
+      if (this.isLandingPageOn && !this.LandingPageRemoved) {
+        this.LandingPageRemoved = true
+        this.target.removeChild(this.LandingPage)
+        this.isLandingPageOn = false
+      }
+    }
+  }
+  createSampleLandingPage(): Element {
+    var container = this.target.appendChild(document.createElement("div"))
+    container.classList.add("speckle-landing")
+
+    var img = document.createElement("div")
+    img.classList.add("speckle-logo")
+    container.appendChild(img)
+
+    var subtext = document.createElement("p")
+    subtext.classList.add("heading")
+    subtext.textContent = "PowerBI 3D Viewer"
+    container.appendChild(subtext)
+
+    var tipContainer = document.createElement("div")
+    tipContainer.classList.add("tip-container")
+
+    var tip = document.createElement("p")
+    tip.textContent = "Getting started 💡"
+    tip.classList.add("tip")
+    tipContainer.appendChild(tip)
+
+    var instructions = document.createElement("p")
+    instructions.classList.add("instructions")
+    instructions.textContent =
+      "Please connect the Stream ID and Object ID fields."
+    tipContainer.appendChild(instructions)
+
+    var instructions2 = document.createElement("p")
+    instructions2.classList.add("instructions")
+    instructions2.textContent =
+      "Optionally, connect the 'Object Data' field to color the objects by a value"
+    tipContainer.appendChild(instructions2)
+
+    var instructions2 = document.createElement("p")
+    instructions2.classList.add("instructions")
+    instructions2.classList.add("docs")
+    instructions2.innerHTML =
+      "For more info, check our docs page <b>https://speckle.guide</b>"
+    tipContainer.appendChild(instructions2)
+
+    container.appendChild(tipContainer)
+    return container
   }
 
   private getCustomColorGroups(prop: PropertyInfo, customColors: string[]) {

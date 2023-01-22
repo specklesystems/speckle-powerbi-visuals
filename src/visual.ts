@@ -3,7 +3,9 @@
 import "core-js/stable"
 import "regenerator-runtime/runtime" /* <---- add this line */
 import "./../style/visual.less"
+
 import powerbi from "powerbi-visuals-api"
+
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
 import ITooltipService = powerbi.extensibility.ITooltipService
@@ -13,21 +15,22 @@ import VisualObjectInstance = powerbi.VisualObjectInstance
 import DataView = powerbi.DataView
 import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject
 
+import interpolate from "color-interpolate"
+
 import { SpeckleVisualSettings } from "./settings"
 import {
   Viewer,
   CanonicalView,
   ViewerEvent,
-  ObjectPredicate
+  PropertyInfo
 } from "@speckle/viewer"
-import * as _ from "lodash"
+import _ from "lodash"
 import {
   VisualUpdateTypeToString,
   cleanupDataColumnName,
   projectToScreen
 } from "./utils"
 import { SettingsChangedType, Tracker } from "./mixpanel"
-import { throttle } from "lodash"
 
 interface SpeckleTooltip {
   worldPos: {
@@ -163,10 +166,9 @@ export class Visual implements IVisual {
       return
     }
 
-    var objectUrls = streamCategory.map((stream, index) => {
-      var url = `${stream}/objects/${objectIdCategory[index]}`
-      return url
-    })
+    var objectUrls = streamCategory.map(
+      (stream, index) => `${stream}/objects/${objectIdCategory[index]}`
+    )
 
     var objectsToUnload = []
     for (const key of this.selectionIdMap.keys()) {
@@ -215,16 +217,13 @@ export class Visual implements IVisual {
       index++
     }
 
-    var colorList = this.settings.color.getColorList()
-    // Once everything is loaded, run the filter
-    var filter = null
-    var name = null
-
     if (signal?.aborted) return
     Tracker.dataReload()
-    console.log("Applying filter:", filter)
+
+    var colorList = this.settings.color.getColorList()
+
     if (categoricalView?.values) {
-      name = categoricalView?.values[0].source.displayName
+      var name = categoricalView?.values[0].source.displayName
       var objectIds = highlightedValues
         ? highlightedValues
             .map((value, index) =>
@@ -241,10 +240,19 @@ export class Visual implements IVisual {
       var prop = this.viewer
         .getObjectProperties(null, true)
         .find(item => item.key == cleanupDataColumnName(name))
-      var state = await this.viewer.setColorFilter(prop).catch(async e => {
-        console.warn("Filter failed to be applied. Filter will be reset", e)
-        return await this.viewer.removeColorFilter()
-      })
+
+      console.log("Prop found", prop)
+
+      if (prop.type == "number") {
+        var groups = this.getCustomColorGroups(prop, colorList)
+        //@ts-ignore
+        await this.viewer.setUserObjectColors(groups)
+      } else {
+        await this.viewer.setColorFilter(prop).catch(async e => {
+          console.warn("Filter failed to be applied. Filter will be reset", e)
+          return await this.viewer.removeColorFilter()
+        })
+      }
     } else {
       await this.viewer.resetFilters()
     }
@@ -289,7 +297,6 @@ export class Visual implements IVisual {
   }, 500)
 
   private throttleCameraUpdate = _.throttle(options => {
-    console.log("Camera updated", this.currentTooltip)
     if (!this.currentTooltip) return
     var newScreenLoc = projectToScreen(
       this.viewer.cameraHandler.camera,
@@ -297,10 +304,9 @@ export class Visual implements IVisual {
     )
     this.currentTooltip.tooltip.coordinates = [newScreenLoc.x, newScreenLoc.y]
     this.tooltipService.move(this.currentTooltip.tooltip)
-  }, 100)
+  }, 1000.0 / 60.0)
 
   private onObjectClicked = arg => {
-    console.log("object clicked", arg)
     if (!arg) {
       this.tooltipService.hide({ immediately: true, isTouchEvent: false })
       this.currentTooltip = null
@@ -365,5 +371,22 @@ export class Visual implements IVisual {
       tooltip: tooltipData
     }
     this.tooltipService.show(tooltipData)
+  }
+
+  private getCustomColorGroups(prop: PropertyInfo, customColors: string[]) {
+    var groups: [{ value: number; id?: string; ids?: string[] }] =
+      //@ts-ignore
+      prop.valueGroups
+    if (!groups) return null
+    var colorGrad = interpolate(customColors)
+    return groups.map(group => {
+      //@ts-ignore
+      var color = colorGrad((group.value - prop.min) / (prop.max - prop.min))
+      var objectIds = group.ids ?? [group.id]
+      return {
+        objectIds,
+        color
+      }
+    })
   }
 }

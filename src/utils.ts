@@ -55,7 +55,7 @@ export function projectToScreen(cam: any, loc: any) {
   var copy = loc.clone()
   copy.project(cam)
   return {
-    x: (copy.x * 0.5 + 0.5) * window.innerWidth,
+    x: (copy.x * 0.5 + 0.5) * window.innerWidth - 10,
     y: (copy.y * -0.5 + 0.5) * window.innerHeight
   }
 }

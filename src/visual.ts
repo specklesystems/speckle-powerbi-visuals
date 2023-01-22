@@ -221,10 +221,8 @@ export class Visual implements IVisual {
     if (signal?.aborted) return
     Tracker.dataReload()
 
-    console.log("cat values")
     var colorList = this.settings.color.getColorList()
     if (categoricalView?.values) {
-      console.log("cat values exist")
       var name = categoricalView?.values[0].source.displayName
       var objectIds = highlightedValues
         ? highlightedValues
@@ -254,7 +252,6 @@ export class Visual implements IVisual {
         })
       }
     } else {
-      console.log("reset filters")
       await this.viewer.resetFilters()
       this.viewer.zoom()
     }

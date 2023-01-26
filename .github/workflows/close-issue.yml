@@ -6,7 +6,7 @@ on:
 
 jobs:
   update_issue:
-    uses: specklesystems/github-actions/.github/workflows/project-add-issue.yml@main
+    uses: specklesystems/github-actions/.github/workflows/project-update-issue-status.yml@main
     secrets: inherit
     with:
       issue-id: ${{ github.event.issue.node_id }}

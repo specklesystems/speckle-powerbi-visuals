@@ -195,20 +195,30 @@ export class Visual implements IVisual {
     }
 
     var index = 0
+    var promises = []
+    const batchSize = 25
     for (const url of objectUrls) {
       if (signal?.aborted) return
-      if (!this.selectionIdMap.has(url))
-        await this.viewer.loadObject(url, null, false).catch((e: Error) => {
-          //@ts-ignore
-          this.host.displayWarningIcon(
-            "Load error",
-            `One or more objects could not be loaded
+      if (!this.selectionIdMap.has(url)) {
+        var promise = this.viewer
+          .loadObject(url, null, false)
+          .catch((e: Error) => {
+            //@ts-ignore
+            this.host.displayWarningIcon(
+              "Load error",
+              `One or more objects could not be loaded
               Please ensure that the stream you're trying to access is PUBLIC
               The Speckle PowerBI Viewer cannot handle private streams yet.`
-          )
-          console.warn("Viewer Load error XX", url, e.name)
-        })
-
+            )
+            console.warn("Viewer Load error:", url, e.name)
+          })
+        promises.push(promise)
+        if (promises.length == batchSize) {
+          await Promise.all(promises)
+          promises = []
+        }
+      }
+      // We create selection Ids for all objects, regardless if they're there already.
       //@ts-ignore
       var selectionBuilder = this.host.createSelectionIdBuilder()
       var selectionId = selectionBuilder
@@ -217,6 +227,7 @@ export class Visual implements IVisual {
       this.selectionIdMap.set(url, selectionId)
       index++
     }
+    await Promise.all(promises)
 
     if (signal?.aborted) return
     Tracker.dataReload()

@@ -31,7 +31,7 @@ import {
   projectToScreen
 } from "./utils"
 import { SettingsChangedType, Tracker } from "./mixpanel"
-
+import createSampleLandingPage from "./landingPage"
 interface SpeckleTooltip {
   worldPos: {
     x: number
@@ -61,6 +61,11 @@ export class Visual implements IVisual {
   private currentOrthoMode: boolean = false
   private currentDefaultView: string = "default"
   private currentTooltip: SpeckleTooltip = null
+
+  private isLandingPageOn = false
+  private LandingPageRemoved = false
+
+  private LandingPage: Element = null
 
   constructor(options: VisualConstructorOptions) {
     Tracker.loaded()
@@ -106,20 +111,18 @@ export class Visual implements IVisual {
       this.settings
     )
 
-    // TODO: These cases are not being handled right now, we will skip the update logic.
-    // Some are already handled by our viewer, such as resize, but others may require custom implementations in the future.
     switch (options.type) {
       case powerbi.VisualUpdateType.Resize:
       case powerbi.VisualUpdateType.ResizeEnd:
       case powerbi.VisualUpdateType.Style:
       case powerbi.VisualUpdateType.ViewMode:
       case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
-        // Ignore case, nothing will happen
+        // TODO: These cases are not being handled right now, we will skip the update logic.
+        // Some are already handled by our viewer, such as resize, but others may require custom implementations in the future.
         return
-    }
-
-    console.log("Data was updated, updating viewer...")
+      default:
     this.debounceUpdate(options)
+  }
   }
 
   private async handleSettingsUpdate(options: VisualUpdateOptions) {
@@ -381,21 +384,14 @@ export class Visual implements IVisual {
     this.tooltipService.show(tooltipData)
   }
 
-  private isLandingPageOn = false
-  private LandingPageRemoved = false
-
-  private LandingPage: Element = null
-
   private HandleLandingPage(options: VisualUpdateOptions) {
-    console.log("handle landing page")
     if (
       !options.dataViews ||
       !options.dataViews[0]?.metadata?.columns?.length
     ) {
       if (!this.isLandingPageOn) {
         this.isLandingPageOn = true
-        const SampleLandingPage: Element = this.createSampleLandingPage() //create a landing page
-        this.LandingPage = SampleLandingPage
+        this.LandingPage = createSampleLandingPage()
       }
     } else {
       if (this.isLandingPageOn && !this.LandingPageRemoved) {
@@ -404,49 +400,6 @@ export class Visual implements IVisual {
         this.isLandingPageOn = false
       }
     }
-  }
-  createSampleLandingPage(): Element {
-    var container = this.target.appendChild(document.createElement("div"))
-    container.classList.add("speckle-landing")
-
-    var img = document.createElement("div")
-    img.classList.add("speckle-logo")
-    container.appendChild(img)
-
-    var subtext = document.createElement("p")
-    subtext.classList.add("heading")
-    subtext.textContent = "PowerBI 3D Viewer"
-    container.appendChild(subtext)
-
-    var tipContainer = document.createElement("div")
-    tipContainer.classList.add("tip-container")
-
-    var tip = document.createElement("p")
-    tip.textContent = "Getting started 💡"
-    tip.classList.add("tip")
-    tipContainer.appendChild(tip)
-
-    var instructions = document.createElement("p")
-    instructions.classList.add("instructions")
-    instructions.textContent =
-      "Please connect the Stream ID and Object ID fields."
-    tipContainer.appendChild(instructions)
-
-    var instructions2 = document.createElement("p")
-    instructions2.classList.add("instructions")
-    instructions2.textContent =
-      "Optionally, connect the 'Object Data' field to color the objects by a value"
-    tipContainer.appendChild(instructions2)
-
-    var instructions2 = document.createElement("p")
-    instructions2.classList.add("instructions")
-    instructions2.classList.add("docs")
-    instructions2.innerHTML =
-      "For more info, check our docs page <b>https://speckle.guide</b>"
-    tipContainer.appendChild(instructions2)
-
-    container.appendChild(tipContainer)
-    return container
   }
 
   private getCustomColorGroups(prop: PropertyInfo, customColors: string[]) {

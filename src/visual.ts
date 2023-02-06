@@ -1,5 +1,3 @@
-"use strict"
-
 import "core-js/stable"
 import "regenerator-runtime/runtime" /* <---- add this line */
 import "./../style/visual.less"
@@ -24,7 +22,7 @@ import {
   ViewerEvent,
   PropertyInfo
 } from "@speckle/viewer"
-import _ from "lodash"
+import * as _ from "lodash"
 import {
   VisualUpdateTypeToString,
   cleanupDataColumnName,
@@ -32,19 +30,7 @@ import {
 } from "./utils"
 import { SettingsChangedType, Tracker } from "./mixpanel"
 import createSampleLandingPage from "./landingPage"
-interface SpeckleTooltip {
-  worldPos: {
-    x: number
-    y: number
-    z: number
-  }
-  screenPos: {
-    x: number
-    y: number
-  }
-  tooltip: any
-  id: string
-}
+import { SpeckleTooltip } from "./SpeckleTooltip"
 
 export class Visual implements IVisual {
   private target: HTMLElement
@@ -121,8 +107,8 @@ export class Visual implements IVisual {
         // Some are already handled by our viewer, such as resize, but others may require custom implementations in the future.
         return
       default:
-    this.debounceUpdate(options)
-  }
+        this.debounceUpdate(options)
+    }
   }
 
   private async handleSettingsUpdate(options: VisualUpdateOptions) {
@@ -144,6 +130,10 @@ export class Visual implements IVisual {
 
     // Update bg of viewer
     this.target.style.backgroundColor = this.settings.color.background
+  }
+
+  private getTooltipDataValues(categoricalView: powerbi.DataViewCategorical) {
+    if (!categoricalView.values) return // Return nothing
   }
 
   private async handleDataUpdate(
@@ -235,9 +225,7 @@ export class Visual implements IVisual {
     if (signal?.aborted) return
     Tracker.dataReload()
 
-    var colorList = this.settings.color.getColorList()
     if (categoricalView?.values) {
-      var name = categoricalView?.values[0].source.displayName
       var objectIds = highlightedValues
         ? highlightedValues
             .map((value, index) =>
@@ -245,25 +233,44 @@ export class Visual implements IVisual {
             )
             .filter(e => e != null)
         : null
+      console.log("object ids", objectIds)
       if (objectIds) {
         await this.viewer.resetFilters()
         await this.viewer.isolateObjects(objectIds, null, true, true)
+        console.log("isolated filters")
       } else {
         await this.viewer.resetFilters()
+        console.log("reset filters")
       }
-      var prop = this.viewer
-        .getObjectProperties(null, true)
-        .find(item => item.key == cleanupDataColumnName(name))
 
-      if (prop.type == "number") {
-        var groups = this.getCustomColorGroups(prop, colorList)
-        //@ts-ignore
-        await this.viewer.setUserObjectColors(groups)
+      var objectDataColumns = categoricalView.values.filter(
+        v => v.source.roles.objectColorBy
+      )
+
+      if (objectDataColumns.length == 0) {
+        console.log("removing color filter")
+        await this.viewer.removeColorFilter()
       } else {
-        await this.viewer.setColorFilter(prop).catch(async e => {
-          console.warn("Filter failed to be applied. Filter will be reset", e)
-          return await this.viewer.removeColorFilter()
-        })
+        var colorList = this.settings.color.getColorList()
+        var name = objectDataColumns[0].source.displayName
+
+        var prop = this.viewer
+          .getObjectProperties(null, true)
+          .find(item => item.key == cleanupDataColumnName(name))
+
+        if (prop.type == "number") {
+          var groups = this.getCustomColorGroups(prop, colorList)
+          //@ts-ignore
+          await this.viewer.setUserObjectColors(groups)
+          await this.viewer.isolateObjects(objectIds, null, true, true)
+          console.log("applied numeric filter")
+        } else {
+          await this.viewer.setColorFilter(prop).catch(async e => {
+            console.warn("Filter failed to be applied. Filter will be reset", e)
+            return await this.viewer.removeColorFilter()
+          })
+          console.log("applied prop filter")
+        }
       }
     } else {
       await this.viewer.resetFilters()

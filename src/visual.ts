@@ -32,6 +32,10 @@ import { SettingsChangedType, Tracker } from "./mixpanel"
 import createSampleLandingPage from "./landingPage"
 import { SpeckleTooltip } from "./SpeckleTooltip"
 
+type SpeckleSelectionData = {
+  id: powerbi.extensibility.ISelectionId
+  data: { displayName: string; value: any }[]
+}
 export class Visual implements IVisual {
   private target: HTMLElement
   private settings: SpeckleVisualSettings
@@ -39,7 +43,7 @@ export class Visual implements IVisual {
   private selectionManager: powerbi.extensibility.ISelectionManager
   private tooltipService: ITooltipService
 
-  private selectionIdMap: Map<string, powerbi.extensibility.ISelectionId>
+  private selectionIdMap: Map<string, SpeckleSelectionData>
   private viewer: Viewer
 
   private updateTask: Promise<void>
@@ -56,7 +60,7 @@ export class Visual implements IVisual {
   constructor(options: VisualConstructorOptions) {
     Tracker.loaded()
     this.host = options.host
-    this.selectionIdMap = new Map<string, powerbi.extensibility.ISelectionId>()
+    this.selectionIdMap = new Map<string, SpeckleSelectionData>()
     //@ts-ignore
     this.selectionManager = this.host.createSelectionManager()
     //@ts-ignore
@@ -157,7 +161,7 @@ export class Visual implements IVisual {
         `Incomplete data input. "Stream URL" and "Object ID" data inputs are mandatory`
       )
       await this.viewer.unloadAll()
-      this.selectionIdMap = new Map<string, any>()
+      this.selectionIdMap = new Map<string, SpeckleSelectionData>()
       return
     }
 
@@ -214,10 +218,25 @@ export class Visual implements IVisual {
       // We create selection Ids for all objects, regardless if they're there already.
       //@ts-ignore
       var selectionBuilder = this.host.createSelectionIdBuilder()
-      var selectionId = selectionBuilder
+      var selectionId: powerbi.extensibility.ISelectionId = selectionBuilder
         .withCategory(categoricalView?.categories[1], index)
         .createSelectionId()
-      this.selectionIdMap.set(url, selectionId)
+      const objectDataColumns = categoricalView.values.filter(
+        v => v.source.roles.objectData
+      )
+
+      const tooltipData = objectDataColumns.map(col => {
+        const name = cleanupDataColumnName(col.source.displayName)
+        return {
+          displayName: name,
+          value: col.values[index].toString()
+        }
+      })
+
+      this.selectionIdMap.set(url, {
+        id: selectionId,
+        data: tooltipData
+      })
       index++
     }
     await Promise.all(promises)
@@ -337,13 +356,13 @@ export class Visual implements IVisual {
     this.viewer.selectObjects([hit.object.id])
 
     this.showTooltip(hit)
-    this.selectionManager.select(this.selectionIdMap.get(hit.guid), false)
+    this.selectionManager.select(this.selectionIdMap.get(hit.guid).id, false)
   }
 
   private onObjectDoubleClicked = arg => {
     if (!arg) return
     var hit = arg.hits[0]
-    var selectionId = this.selectionIdMap.get(hit.guid)
+    var selectionId = this.selectionIdMap.get(hit.guid).id
     const screenLoc = projectToScreen(
       this.viewer.cameraHandler.camera,
       hit.point
@@ -360,25 +379,25 @@ export class Visual implements IVisual {
     return container
   }
 
-  private showTooltip(hit: any) {
-    var selectionId = this.selectionIdMap.get(hit.guid)
+  private showTooltip(hit: { guid: string; object: any; point: any }) {
+    var selectionData = this.selectionIdMap.get(hit.guid)
     const screenLoc = projectToScreen(
       this.viewer.cameraHandler.camera,
       hit.point
     )
-    var dataItems = Object.keys(hit.object)
-      .filter(key => !key.startsWith("__"))
-      .map(key => {
-        return {
-          displayName: key,
-          value: hit.object[key]
-        }
-      })
+    // var dataItems = Object.keys(hit.object)
+    //   .filter(key => !key.startsWith("__"))
+    //   .map(key => {
+    //     return {
+    //       displayName: key,
+    //       value: hit.object[key]
+    //     }
+    //   })
 
     const tooltipData = {
       coordinates: [screenLoc.x, screenLoc.y],
-      dataItems: dataItems,
-      identities: [selectionId],
+      dataItems: selectionData.data,
+      identities: [selectionData.id],
       isTouchEvent: false
     }
 

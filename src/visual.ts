@@ -1,5 +1,3 @@
-"use strict"
-
 import "core-js/stable"
 import "regenerator-runtime/runtime" /* <---- add this line */
 import "./../style/visual.less"
@@ -24,7 +22,7 @@ import {
   ViewerEvent,
   PropertyInfo
 } from "@speckle/viewer"
-import _ from "lodash"
+import * as _ from "lodash"
 import {
   VisualUpdateTypeToString,
   cleanupDataColumnName,
@@ -32,20 +30,12 @@ import {
 } from "./utils"
 import { SettingsChangedType, Tracker } from "./mixpanel"
 import createSampleLandingPage from "./landingPage"
-interface SpeckleTooltip {
-  worldPos: {
-    x: number
-    y: number
-    z: number
-  }
-  screenPos: {
-    x: number
-    y: number
-  }
-  tooltip: any
-  id: string
-}
+import { SpeckleTooltip } from "./SpeckleTooltip"
 
+type SpeckleSelectionData = {
+  id: powerbi.extensibility.ISelectionId
+  data: { displayName: string; value: any }[]
+}
 export class Visual implements IVisual {
   private target: HTMLElement
   private settings: SpeckleVisualSettings
@@ -53,7 +43,7 @@ export class Visual implements IVisual {
   private selectionManager: powerbi.extensibility.ISelectionManager
   private tooltipService: ITooltipService
 
-  private selectionIdMap: Map<string, powerbi.extensibility.ISelectionId>
+  private selectionIdMap: Map<string, SpeckleSelectionData>
   private viewer: Viewer
 
   private updateTask: Promise<void>
@@ -70,7 +60,7 @@ export class Visual implements IVisual {
   constructor(options: VisualConstructorOptions) {
     Tracker.loaded()
     this.host = options.host
-    this.selectionIdMap = new Map<string, powerbi.extensibility.ISelectionId>()
+    this.selectionIdMap = new Map<string, SpeckleSelectionData>()
     //@ts-ignore
     this.selectionManager = this.host.createSelectionManager()
     //@ts-ignore
@@ -121,8 +111,8 @@ export class Visual implements IVisual {
         // Some are already handled by our viewer, such as resize, but others may require custom implementations in the future.
         return
       default:
-    this.debounceUpdate(options)
-  }
+        this.debounceUpdate(options)
+    }
   }
 
   private async handleSettingsUpdate(options: VisualUpdateOptions) {
@@ -146,6 +136,10 @@ export class Visual implements IVisual {
     this.target.style.backgroundColor = this.settings.color.background
   }
 
+  private getTooltipDataValues(categoricalView: powerbi.DataViewCategorical) {
+    if (!categoricalView.values) return // Return nothing
+  }
+
   private async handleDataUpdate(
     options: VisualUpdateOptions,
     signal: AbortSignal
@@ -167,7 +161,7 @@ export class Visual implements IVisual {
         `Incomplete data input. "Stream URL" and "Object ID" data inputs are mandatory`
       )
       await this.viewer.unloadAll()
-      this.selectionIdMap = new Map<string, any>()
+      this.selectionIdMap = new Map<string, SpeckleSelectionData>()
       return
     }
 
@@ -224,10 +218,28 @@ export class Visual implements IVisual {
       // We create selection Ids for all objects, regardless if they're there already.
       //@ts-ignore
       var selectionBuilder = this.host.createSelectionIdBuilder()
-      var selectionId = selectionBuilder
+      var selectionId: powerbi.extensibility.ISelectionId = selectionBuilder
         .withCategory(categoricalView?.categories[1], index)
         .createSelectionId()
-      this.selectionIdMap.set(url, selectionId)
+
+      const objectDataColumns = categoricalView.values?.filter(
+        v => v.source.roles.objectData
+      )
+      if (objectDataColumns) {
+        const tooltipData = objectDataColumns.map(col => {
+          const name = cleanupDataColumnName(col.source.displayName)
+          return {
+            displayName: name,
+            value: col.values[index].toString()
+          }
+        })
+        if (tooltipData.length == 0)
+          tooltipData.push({ displayName: "No data", value: null })
+        this.selectionIdMap.set(url, {
+          id: selectionId,
+          data: tooltipData
+        })
+      }
       index++
     }
     await Promise.all(promises)
@@ -235,9 +247,7 @@ export class Visual implements IVisual {
     if (signal?.aborted) return
     Tracker.dataReload()
 
-    var colorList = this.settings.color.getColorList()
     if (categoricalView?.values) {
-      var name = categoricalView?.values[0].source.displayName
       var objectIds = highlightedValues
         ? highlightedValues
             .map((value, index) =>
@@ -245,25 +255,43 @@ export class Visual implements IVisual {
             )
             .filter(e => e != null)
         : null
+      console.log("object ids", objectIds)
       if (objectIds) {
         await this.viewer.resetFilters()
         await this.viewer.isolateObjects(objectIds, null, true, true)
+        console.log("isolated filters")
       } else {
         await this.viewer.resetFilters()
+        console.log("reset filters")
       }
-      var prop = this.viewer
-        .getObjectProperties(null, true)
-        .find(item => item.key == cleanupDataColumnName(name))
 
-      if (prop.type == "number") {
-        var groups = this.getCustomColorGroups(prop, colorList)
-        //@ts-ignore
-        await this.viewer.setUserObjectColors(groups)
+      var objectDataColumns = categoricalView.values.filter(
+        v => v.source.roles.objectColorBy
+      )
+
+      if (objectDataColumns.length == 0) {
+        console.log("removing color filter")
+        await this.viewer.removeColorFilter()
       } else {
-        await this.viewer.setColorFilter(prop).catch(async e => {
-          console.warn("Filter failed to be applied. Filter will be reset", e)
-          return await this.viewer.removeColorFilter()
-        })
+        var colorList = this.settings.color.getColorList()
+        var name = objectDataColumns[0].source.displayName
+
+        var prop = this.viewer
+          .getObjectProperties(null, true)
+          .find(item => item.key == cleanupDataColumnName(name))
+
+        if (prop.type == "number") {
+          var groups = this.getCustomColorGroups(prop, colorList)
+          //@ts-ignore
+          await this.viewer.setUserObjectColors(groups)
+          console.log("applied numeric filter")
+        } else {
+          await this.viewer.setColorFilter(prop).catch(async e => {
+            console.warn("Filter failed to be applied. Filter will be reset", e)
+            return await this.viewer.removeColorFilter()
+          })
+          console.log("applied prop filter")
+        }
       }
     } else {
       await this.viewer.resetFilters()
@@ -330,13 +358,13 @@ export class Visual implements IVisual {
     this.viewer.selectObjects([hit.object.id])
 
     this.showTooltip(hit)
-    this.selectionManager.select(this.selectionIdMap.get(hit.guid), false)
+    this.selectionManager.select(this.selectionIdMap.get(hit.guid).id, false)
   }
 
   private onObjectDoubleClicked = arg => {
     if (!arg) return
     var hit = arg.hits[0]
-    var selectionId = this.selectionIdMap.get(hit.guid)
+    var selectionId = this.selectionIdMap.get(hit.guid).id
     const screenLoc = projectToScreen(
       this.viewer.cameraHandler.camera,
       hit.point
@@ -353,25 +381,17 @@ export class Visual implements IVisual {
     return container
   }
 
-  private showTooltip(hit: any) {
-    var selectionId = this.selectionIdMap.get(hit.guid)
+  private showTooltip(hit: { guid: string; object: any; point: any }) {
+    var selectionData = this.selectionIdMap.get(hit.guid)
     const screenLoc = projectToScreen(
       this.viewer.cameraHandler.camera,
       hit.point
     )
-    var dataItems = Object.keys(hit.object)
-      .filter(key => !key.startsWith("__"))
-      .map(key => {
-        return {
-          displayName: key,
-          value: hit.object[key]
-        }
-      })
 
     const tooltipData = {
       coordinates: [screenLoc.x, screenLoc.y],
-      dataItems: dataItems,
-      identities: [selectionId],
+      dataItems: selectionData.data,
+      identities: [selectionData.id],
       isTouchEvent: false
     }
 

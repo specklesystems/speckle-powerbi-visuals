@@ -221,22 +221,25 @@ export class Visual implements IVisual {
       var selectionId: powerbi.extensibility.ISelectionId = selectionBuilder
         .withCategory(categoricalView?.categories[1], index)
         .createSelectionId()
-      const objectDataColumns = categoricalView.values.filter(
+
+      const objectDataColumns = categoricalView.values?.filter(
         v => v.source.roles.objectData
       )
-
-      const tooltipData = objectDataColumns.map(col => {
-        const name = cleanupDataColumnName(col.source.displayName)
-        return {
-          displayName: name,
-          value: col.values[index].toString()
-        }
-      })
-
-      this.selectionIdMap.set(url, {
-        id: selectionId,
-        data: tooltipData
-      })
+      if (objectDataColumns) {
+        const tooltipData = objectDataColumns.map(col => {
+          const name = cleanupDataColumnName(col.source.displayName)
+          return {
+            displayName: name,
+            value: col.values[index].toString()
+          }
+        })
+        if (tooltipData.length == 0)
+          tooltipData.push({ displayName: "No data", value: null })
+        this.selectionIdMap.set(url, {
+          id: selectionId,
+          data: tooltipData
+        })
+      }
       index++
     }
     await Promise.all(promises)
@@ -281,7 +284,6 @@ export class Visual implements IVisual {
           var groups = this.getCustomColorGroups(prop, colorList)
           //@ts-ignore
           await this.viewer.setUserObjectColors(groups)
-          await this.viewer.isolateObjects(objectIds, null, true, true)
           console.log("applied numeric filter")
         } else {
           await this.viewer.setColorFilter(prop).catch(async e => {
@@ -385,14 +387,6 @@ export class Visual implements IVisual {
       this.viewer.cameraHandler.camera,
       hit.point
     )
-    // var dataItems = Object.keys(hit.object)
-    //   .filter(key => !key.startsWith("__"))
-    //   .map(key => {
-    //     return {
-    //       displayName: key,
-    //       value: hit.object[key]
-    //     }
-    //   })
 
     const tooltipData = {
       coordinates: [screenLoc.x, screenLoc.y],

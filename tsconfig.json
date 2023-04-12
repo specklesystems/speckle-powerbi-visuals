@@ -8,8 +8,9 @@
     "outDir": "./.tmp/build/",
     "moduleResolution": "node",
     "declaration": true,
-    "lib": ["es2015", "dom"],
-    "allowSyntheticDefaultImports": true
+    "lib": ["es2020", "dom"],
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
   },
   "files": ["./src/visual.ts"]
 }

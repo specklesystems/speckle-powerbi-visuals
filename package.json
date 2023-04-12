@@ -13,25 +13,25 @@
     "lint": "tslint -c tslint.json -p tsconfig.json"
   },
   "dependencies": {
-    "@babel/runtime": "7.6.0",
-    "@babel/runtime-corejs2": "7.6.0",
-    "@speckle/viewer": "^2.11.4",
+    "@babel/runtime": "7.21.0",
+    "@babel/runtime-corejs2": "7.21.0",
+    "@speckle/viewer": "^2.13.0",
     "color-interpolate": "^1.0.5",
-    "core-js": "3.2.1",
+    "core-js": "3.30.0",
     "lodash": "^4.17.21",
-    "powerbi-visuals-api": "~5.1.0",
-    "powerbi-visuals-utils-dataviewutils": "2.4.1",
-    "powerbi-visuals-utils-interactivityutils": "^5.7.1",
-    "powerbi-visuals-utils-tooltiputils": "^2.5.2",
-    "regenerator-runtime": "^0.13.9"
+    "powerbi-visuals-api": "~5.3.0",
+    "powerbi-visuals-utils-dataviewutils": "6.0.1",
+    "powerbi-visuals-utils-interactivityutils": "^6.0.2",
+    "powerbi-visuals-utils-tooltiputils": "^6.0.1",
+    "regenerator-runtime": "^0.13.11"
   },
   "devDependencies": {
     "@types/core-js": "^2.5.5",
-    "@types/lodash": "^4.14.188",
+    "@types/lodash": "^4.14.192",
     "@types/regenerator-runtime": "^0.13.1",
-    "ts-loader": "6.1.0",
-    "tslint": "^5.18.0",
+    "ts-loader": "9.4.2",
+    "tslint": "^5.20.1",
     "tslint-microsoft-contrib": "^6.2.0",
-    "typescript": "3.6.3"
+    "typescript": "5.0.4"
   }
 }

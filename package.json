@@ -10,7 +10,7 @@
     "pbiviz": "pbiviz",
     "start": "pbiviz start",
     "package": "pbiviz package",
-    "lint": "tslint -c tslint.json -p tsconfig.json"
+    "lint": "eslint -c .eslintrc.js --ext .ts src/"
   },
   "dependencies": {
     "@babel/runtime": "7.21.0",
@@ -26,12 +26,18 @@
     "regenerator-runtime": "^0.13.11"
   },
   "devDependencies": {
+    "@babel/core": "^7.21.4",
+    "@babel/eslint-parser": "^7.21.3",
     "@types/core-js": "^2.5.5",
     "@types/lodash": "^4.14.192",
     "@types/regenerator-runtime": "^0.13.1",
-    "ts-loader": "9.4.2",
-    "tslint": "^5.20.1",
-    "tslint-microsoft-contrib": "^6.2.0",
-    "typescript": "5.0.4"
+    "@types/three": "^0.150.1",
+    "@typescript-eslint/eslint-plugin": "^5.58.0",
+    "@typescript-eslint/parser": "^5.58.0",
+    "eslint": "^8.38.0",
+    "eslint-config-prettier": "^8.8.0",
+    "prettier": "^2.8.7",
+    "ts-loader": "6.1.0",
+    "typescript": "3.6.3"
   }
 }

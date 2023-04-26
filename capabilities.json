@@ -11,8 +11,13 @@
       "kind": "GroupingOrMeasure"
     },
     {
-      "displayName": "Object Data",
+      "displayName": "Tooltip Data",
       "name": "objectData",
+      "kind": "Measure"
+    },
+    {
+      "displayName": "Color By",
+      "name": "objectColorBy",
       "kind": "Measure"
     }
   ],
@@ -39,7 +44,14 @@
           }
         },
         "values": {
-          "for": { "in": "objectData" }
+          "select": [
+            {
+              "for": { "in": "objectData" }
+            },
+            {
+              "for": { "in": "objectColorBy" }
+            }
+          ]
         }
       }
     }

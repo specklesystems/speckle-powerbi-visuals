@@ -3,7 +3,7 @@
     "allowJs": false,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "target": "es6",
+    "target": "es2020",
     "sourceMap": true,
     "outDir": "./.tmp/build/",
     "moduleResolution": "node",
@@ -12,5 +12,6 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true
   },
-  "files": ["./src/visual.ts"]
+  "files": ["./src/visual.ts"],
+  "include": ["./src/**/*.ts"]
 }

@@ -12,6 +12,6 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true
   },
-  "files": ["./src/visual.ts"],
+  "files": ["./src/visual.ts", "./src/SpeckleSelectionData.ts"],
   "include": ["./src/**/*.ts"]
 }

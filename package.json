@@ -20,6 +20,7 @@
     "core-js": "3.30.0",
     "lodash": "^4.17.21",
     "powerbi-visuals-api": "~5.3.0",
+    "powerbi-visuals-utils-colorutils": "^6.0.1",
     "powerbi-visuals-utils-dataviewutils": "6.0.1",
     "powerbi-visuals-utils-interactivityutils": "^6.0.2",
     "powerbi-visuals-utils-tooltiputils": "^6.0.1",

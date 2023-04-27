@@ -1,7 +1,7 @@
 /** @type {import("eslint").Linter.Config} */
 const config = {
   root: true,
-  parser: "@babel-eslint/parser",
+  parser: "babel-eslint",
   plugins: ["@typescript-eslint"],
   extends: [
     "eslint:recommended",

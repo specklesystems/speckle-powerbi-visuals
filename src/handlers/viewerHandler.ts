@@ -1,9 +1,10 @@
-import { PropertyInfo, Viewer, ViewerEvent } from '@speckle/viewer'
-import { cleanupDataColumnName, projectToScreen } from './utils'
+import { CanonicalView, PropertyInfo, Viewer, ViewerEvent } from '@speckle/viewer'
+import { projectToScreen } from '../utils'
 import interpolate from 'color-interpolate'
-import dataUtils from 'powerbi-visuals-utils-dataviewutils'
+import { SpeckleVisualSettings } from '../settings'
+import { SettingsChangedType, Tracker } from '../mixpanel'
 
-export class ViewerHandler {
+export default class ViewerHandler {
   private viewer: Viewer
   private promises: Promise<void>[]
   private batchSize: number = 25
@@ -19,6 +20,19 @@ export class ViewerHandler {
   public OnObjectDoubleClicked: (hit?: any) => void
   public OnCameraUpdate: () => void
 
+  public changeSettings(oldSettings: SpeckleVisualSettings, newSettings: SpeckleVisualSettings) {
+    if (oldSettings.camera.orthoMode != newSettings.camera.orthoMode) {
+      Tracker.settingsChanged(SettingsChangedType.OrthoMode)
+      if (newSettings.camera.orthoMode) this.viewer.cameraHandler?.setOrthoCameraOn()
+      else this.viewer.cameraHandler?.setPerspectiveCameraOn()
+    }
+
+    if (oldSettings.camera.defaultView != newSettings.camera.defaultView) {
+      Tracker.settingsChanged(SettingsChangedType.DefaultCamera)
+      this.viewer.setView(newSettings.camera.defaultView as CanonicalView)
+    }
+  }
+
   public async init() {
     if (this.viewer) return
 
@@ -33,9 +47,11 @@ export class ViewerHandler {
 
     this.viewer = viewer
   }
+
   onCameraUpdate(arg: any) {
     throw new Error('Method not implemented.')
   }
+
   onObjectDoubleClicked(arg: any) {
     if (!arg) return
     var hit = arg.hits[0]
@@ -44,7 +60,8 @@ export class ViewerHandler {
   }
   onObjectClicked(arg: any) {
     if (!arg) return
-    this.onObjectClicked(arg.hits[0])
+    var hit = arg.hits[0]
+    this.onObjectClicked(hit)
   }
 
   public async unloadObjects(

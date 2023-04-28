@@ -5,17 +5,19 @@ export default class LandingPageHandler {
 
   constructor(target: HTMLElement) {
     this.target = target
+    this.landingPage = createLandingPageElement(this.target)
   }
 
   public show() {
+    console.log('Show landing page')
     if (!this.enabled) {
-      this.landingPage = createLandingPageElement()
       this.target.appendChild(this.landingPage)
       this.enabled = true
     }
   }
 
   public hide() {
+    console.log('Hide landing page')
     if (this.enabled) {
       this.target.removeChild(this.landingPage)
       this.enabled = false
@@ -23,8 +25,8 @@ export default class LandingPageHandler {
   }
 }
 
-function createLandingPageElement(): Element {
-  var container = this.target.appendChild(document.createElement('div'))
+function createLandingPageElement(parent: HTMLElement): Element {
+  var container = parent.appendChild(document.createElement('div'))
   container.classList.add('speckle-landing')
 
   var img = document.createElement('div')

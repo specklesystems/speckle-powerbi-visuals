@@ -36,28 +36,37 @@ export class Visual implements IVisual {
   private ac = new AbortController()
 
   constructor(options: VisualConstructorOptions) {
+    console.log(' - Visual started')
     Tracker.loaded()
     this.host = options.host
     this.target = options.element
 
+    console.log(' - Init handlers')
     //@ts-ignore
-    this.selectionHandler = new SelectionHandler(this.host.createSelectionManager())
+    this.selectionHandler = new SelectionHandler(this.host)
+    this.landingPageHandler = new LandingPageHandler(this.target)
+    this.viewerHandler = new ViewerHandler(this.target)
     //@ts-ignore
     this.tooltipHandler = new TooltipHandler(this.host.tooltipService as ITooltipService)
-    this.tooltipHandler.PingScreenPosition = this.viewerHandler.getScreenPosition
 
-    this.landingPageHandler = new LandingPageHandler(this.target)
+    console.log('Setup handler events')
 
-    this.viewerHandler = new ViewerHandler(this.target)
     this.viewerHandler.OnCameraUpdate = _.throttle(() => {
       this.tooltipHandler.move()
-    }, 1000.0 / 60.0)
-    this.viewerHandler.OnObjectClicked = this.onObjectClicked
-    this.viewerHandler.onObjectDoubleClicked = this.selectionHandler.showContextMenu
+    }, 1000.0 / 60.0).bind(this)
+    this.viewerHandler.OnObjectClicked = this.onObjectClicked.bind(this)
+    this.viewerHandler.OnObjectDoubleClicked = this.selectionHandler.showContextMenu.bind(this)
+    console.log(' - Settings')
+    this.tooltipHandler.PingScreenPosition = this.viewerHandler.getScreenPosition
 
-    SpeckleVisualSettings.OnSettingsChanged = (oldSettings, newSettings) => {
+    SpeckleVisualSettings.OnSettingsChanged = ((oldSettings, newSettings) => {
       this.viewerHandler.changeSettings(oldSettings, newSettings)
-    }
+    }).bind(this)
+
+    //Show landing Page by default
+    this.landingPageHandler.show()
+
+    console.log('Visual setup finished')
   }
 
   private validateOptions(options: VisualUpdateOptions): SpeckleDataInput {
@@ -86,13 +95,17 @@ export class Visual implements IVisual {
   }
 
   public update(options: VisualUpdateOptions) {
+    console.log('Data update')
     var newSettings = Visual.parseSettings(options && options.dataViews && options.dataViews[0])
     SpeckleVisualSettings.handleSettingsUpdate(newSettings)
 
     try {
       var input = this.validateOptions(options)
+      console.log('input validated', input)
       this.landingPageHandler.hide()
     } catch (e) {
+      console.log('validation went wrong', e)
+      this.viewerHandler.clear()
       this.landingPageHandler.show()
       //@ts-ignore
       this.host.displayWarningIcon(
@@ -113,16 +126,22 @@ export class Visual implements IVisual {
       input,
       SpeckleVisualSettings.current
     )
-
-    switch (options.type) {
-      case powerbi.VisualUpdateType.Resize:
-      case powerbi.VisualUpdateType.ResizeEnd:
-      case powerbi.VisualUpdateType.Style:
-      case powerbi.VisualUpdateType.ViewMode:
-      case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
-        return
-      default:
-        this.debounceUpdate(input)
+    try {
+      switch (options.type) {
+        case powerbi.VisualUpdateType.Resize:
+        case powerbi.VisualUpdateType.ResizeEnd:
+        case powerbi.VisualUpdateType.Style:
+        case powerbi.VisualUpdateType.ViewMode:
+        case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
+          return
+        default:
+          this.selectionHandler.setup(input)
+          this.tooltipHandler.setup(options.dataViews[0].categorical)
+          console.log('Update data call')
+          this.debounceUpdate(input)
+      }
+    } catch (error) {
+      console.error('Data update error', error)
     }
   }
 
@@ -141,7 +160,11 @@ export class Visual implements IVisual {
       objectUrls,
       this.onLoad,
       this.onError,
-      (url) => this.selectionHandler.has(url),
+      (url) => {
+        var exists = this.selectionHandler.has(url)
+        console.log('Checking for object existing', this, url, exists)
+        return exists
+      },
       signal
     )
 
@@ -218,10 +241,12 @@ export class Visual implements IVisual {
   }, 500)
 
   private onObjectClicked(hit?) {
+    console.log('Object was clicked', hit, this)
     if (hit) {
-      var selectionData = this.selectionHandler.getData(hit.guid)
+      var selectionId = this.selectionHandler.getData(hit.guid)
       const screenLoc = this.viewerHandler.getScreenPosition(hit.point)
-      this.tooltipHandler.show(hit, selectionData, screenLoc)
+      console.log('showing tooltip', selectionId, screenLoc)
+      //this.tooltipHandler.show(hit, selectionData, screenLoc)
       this.selectionHandler.select(hit.guid)
     } else {
       this.selectionHandler.clear()
@@ -235,7 +260,7 @@ export class Visual implements IVisual {
   private onError(url: string, error: Error) {
     console.log(`Error loading object ${url} with error`, error)
     //@ts-ignore
-    this.host.displayWarningIcon(
+    this.host?.displayWarningIcon(
       'Load error',
       `One or more objects could not be loaded 
       Please ensure that the stream you're trying to access is PUBLIC

@@ -4,22 +4,6 @@ import { dataViewObjectsParser } from 'powerbi-visuals-utils-dataviewutils'
 import DataViewObjectsParser = dataViewObjectsParser.DataViewObjectsParser
 import _ from 'lodash'
 
-export class SpeckleVisualSettings extends DataViewObjectsParser {
-  public camera: CameraSettings = new CameraSettings()
-  public color: ColorSettings = new ColorSettings()
-
-  public static current: SpeckleVisualSettings = new SpeckleVisualSettings()
-
-  public static async handleSettingsUpdate(newSettings: SpeckleVisualSettings) {
-    var same = _.isEqual(this.current, newSettings)
-    if (same) return
-    this.OnSettingsChanged(this.current, newSettings)
-    this.current = newSettings
-  }
-
-  public static OnSettingsChanged(oldSettings, newSettings) {}
-}
-
 export class CameraSettings {
   // Default color
   public orthoMode: boolean = false
@@ -34,5 +18,26 @@ export class ColorSettings {
 
   public getColorList() {
     return [this.startColor, this.midColor, this.endColor]
+  }
+}
+
+export class SpeckleVisualSettings extends DataViewObjectsParser {
+  public camera: CameraSettings
+  public color: ColorSettings
+  public static OnSettingsChanged: (oldSettings, newSettings) => void
+
+  public constructor() {
+    super()
+    this.camera = new CameraSettings()
+    this.color = new ColorSettings()
+  }
+
+  public static current: SpeckleVisualSettings = new SpeckleVisualSettings()
+
+  public static async handleSettingsUpdate(newSettings: SpeckleVisualSettings) {
+    var same = _.isEqual(this.current, newSettings)
+    if (same) return
+    this.OnSettingsChanged(this.current, newSettings)
+    this.current = newSettings
   }
 }

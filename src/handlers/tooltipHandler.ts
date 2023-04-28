@@ -9,19 +9,22 @@ export default class TooltipHandler {
   private tooltipService: ITooltipService
   public currentTooltip: SpeckleTooltip = null
 
-  public PingScreenPosition: (worldPosition) => { x: number; y: number }
+  public PingScreenPosition: (worldPosition) => { x: number; y: number } = null
 
   constructor(tooltipService) {
     this.tooltipService = tooltipService
+    this.data = new Map<string, IViewerTooltipData[]>()
   }
 
   public setup(categoricalView: powerbi.DataViewCategorical) {
+    console.log('Tooltip handler setup', categoricalView)
     if (!categoricalView.values) return // Stop if no values are added, as there will be no tooltip data
 
     const streamColumn = categoricalView.categories.find((c) => c.source.roles.stream)
     const objectColumn = categoricalView.categories.find((c) => c.source.roles.object)
     const objectDataColumns = categoricalView.values.filter((v) => v.source.roles.objectData)
 
+    this.data = new Map<string, IViewerTooltipData[]>()
     for (let index = 0; index < streamColumn.values.length; index++) {
       const stream = streamColumn[index]
       const object = objectColumn[index]

@@ -13,7 +13,7 @@ export default class ViewerHandler {
 
   public constructor(parent: HTMLElement) {
     this.parent = parent
-    this.init()
+    this.promises = []
   }
 
   public OnObjectClicked: (hit?: any) => void
@@ -21,6 +21,7 @@ export default class ViewerHandler {
   public OnCameraUpdate: () => void
 
   public changeSettings(oldSettings: SpeckleVisualSettings, newSettings: SpeckleVisualSettings) {
+    console.log('Changing settings in viewer')
     if (oldSettings.camera.orthoMode != newSettings.camera.orthoMode) {
       Tracker.settingsChanged(SettingsChangedType.OrthoMode)
       if (newSettings.camera.orthoMode) this.viewer.cameraHandler?.setOrthoCameraOn()
@@ -35,33 +36,42 @@ export default class ViewerHandler {
 
   public async init() {
     if (this.viewer) return
-
+    console.log('Initializing viewer')
     var container = this.createContainerDiv(this.parent)
-    const viewer = new Viewer(container)
+    const viewer = new Viewer(container, {
+      verbose: false,
+      keepGeometryData: true,
+      environmentSrc: null,
+      showStats: true
+    })
     await viewer.init()
 
     // Setup any events here (progress, load-complete...)
-    viewer.on(ViewerEvent.ObjectClicked, this.onObjectClicked)
-    viewer.on(ViewerEvent.ObjectDoubleClicked, this.onObjectDoubleClicked)
-    viewer.cameraHandler.controls.addEventListener('update', this.onCameraUpdate)
+    viewer.on(ViewerEvent.ObjectClicked, this.objectClicked.bind(this))
+    viewer.on(ViewerEvent.ObjectDoubleClicked, this.objectDoubleClicked.bind(this))
+    viewer.cameraHandler.controls.addEventListener('update', this.onCameraUpdate.bind(this))
 
     this.viewer = viewer
+    console.log('Viewer initialized')
   }
 
-  onCameraUpdate(arg: any) {
-    throw new Error('Method not implemented.')
+  private onCameraUpdate(arg: any) {
+    if (this.OnCameraUpdate) this.OnCameraUpdate()
   }
 
-  onObjectDoubleClicked(arg: any) {
+  private objectDoubleClicked(arg: any) {
     if (!arg) return
     var hit = arg.hits[0]
-    this.OnObjectDoubleClicked(hit)
+    if (this.OnObjectDoubleClicked) this.OnObjectDoubleClicked(hit)
+  }
+  private objectClicked(arg: any) {
+    console.log('viewer clicked event', arg)
+    var hit = arg?.hits[0]
+    if (!hit) {
+      this.viewer.resetSelection()
+    }
+    if (this.OnObjectClicked) this.OnObjectClicked(hit)
     this.selectObjects(hit ? [hit.object.id] : null)
-  }
-  onObjectClicked(arg: any) {
-    if (!arg) return
-    var hit = arg.hits[0]
-    this.onObjectClicked(hit)
   }
 
   public async unloadObjects(
@@ -75,10 +85,13 @@ export default class ViewerHandler {
         .cancelLoad(url, true)
         .catch((e) => console.warn('Viewer Unload error', url, e))
         .finally(() => {
+          if (this.loadedObjectsCache.has(url)) this.loadedObjectsCache.delete(url)
           if (onObjectUnloaded) onObjectUnloaded(url)
         })
     }
   }
+
+  public loadedObjectsCache: Set<string> = new Set<string>()
 
   public async loadObjects(
     objectUrls: string[],
@@ -90,10 +103,13 @@ export default class ViewerHandler {
     var index = 0
     for (const url of objectUrls) {
       if (signal?.aborted) return
-      if (!doesObjectExist(url)) {
+      if (!this.loadedObjectsCache.has(url)) {
         var promise = this.viewer
           .loadObject(url, this.authToken, false)
           .catch((e: Error) => onError(url, e))
+          .finally(() => {
+            if (!this.loadedObjectsCache.has(url)) this.loadedObjectsCache.add(url)
+          })
         this.promises.push(promise)
         if (this.promises.length == this.batchSize) {
           await Promise.all(this.promises)
@@ -131,8 +147,15 @@ export default class ViewerHandler {
   }
 
   public async colorObjects(propertyName: string, colorList: any) {
-    var prop = this.viewer.getObjectProperties(null, true).find((item) => item.key == propertyName)
-
+    console.log('Coloring objects', propertyName, colorList)
+    var props = this.viewer.getObjectProperties(null, true)
+    console.log('Viewer props', props)
+    if (props.length == 0) return
+    var prop = props.find((item) => {
+      console.log('finding prop', item)
+      return item.key == propertyName
+    })
+    console.log('Prop to color by', prop)
     if (prop.type == 'number') {
       var groups = this.getCustomColorGroups(prop, colorList)
       //@ts-ignore
@@ -162,6 +185,7 @@ export default class ViewerHandler {
   }
 
   public getScreenPosition(worldPosition): { x: number; y: number } {
+    console.log('Getting screen position')
     return projectToScreen(this.viewer.cameraHandler.camera, worldPosition)
   }
 

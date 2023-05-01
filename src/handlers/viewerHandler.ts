@@ -79,6 +79,7 @@ export default class ViewerHandler {
     signal?: AbortSignal,
     onObjectUnloaded?: (url: string) => void
   ) {
+    console.log('Unloading objects', this)
     for (const url of objects) {
       if (signal?.aborted) return
       await this.viewer
@@ -147,12 +148,11 @@ export default class ViewerHandler {
   }
 
   public async colorObjects(propertyName: string, colorList: any) {
-    console.log('Coloring objects', propertyName, colorList)
+    console.log('Coloring objects by', propertyName)
+
     var props = this.viewer.getObjectProperties(null, true)
-    console.log('Viewer props', props)
     if (props.length == 0) return
     var prop = props.find((item) => {
-      console.log('finding prop', item)
       return item.key == propertyName
     })
     console.log('Prop to color by', prop)
@@ -166,17 +166,17 @@ export default class ViewerHandler {
         console.warn('Filter failed to be applied. Filter will be reset', e)
         return await this.viewer.removeColorFilter()
       })
-      console.log('applied prop filter')
+      console.log('applied property filter')
     }
   }
 
   public async resetFilters(zoomExtents: boolean = false) {
     await this.viewer.resetFilters()
-    this.viewer.zoom()
+    if (zoomExtents) this.viewer.zoom()
   }
 
   public async clear() {
-    await this.viewer.unloadAll()
+    if (this.viewer) await this.viewer.unloadAll()
   }
 
   public async selectObjects(objectIds: string[] = null) {

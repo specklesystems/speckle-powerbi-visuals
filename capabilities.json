@@ -11,13 +11,13 @@
       "kind": "GroupingOrMeasure"
     },
     {
-      "displayName": "Tooltip Data",
-      "name": "objectData",
+      "displayName": "Color By",
+      "name": "objectColorBy",
       "kind": "Measure"
     },
     {
-      "displayName": "Color By",
-      "name": "objectColorBy",
+      "displayName": "Tooltip Data",
+      "name": "objectData",
       "kind": "Measure"
     }
   ],
@@ -35,6 +35,11 @@
               "for": {
                 "in": "object"
               }
+            },
+            {
+              "for": {
+                "in": "objectColorBy"
+              }
             }
           ],
           "dataReductionAlgorithm": {
@@ -44,14 +49,7 @@
           }
         },
         "values": {
-          "select": [
-            {
-              "for": { "in": "objectData" }
-            },
-            {
-              "for": { "in": "objectColorBy" }
-            }
-          ]
+          "select": [{ "for": { "in": "objectData" } }]
         }
       }
     }

@@ -14,6 +14,11 @@ import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInst
 import VisualObjectInstance = powerbi.VisualObjectInstance
 import DataView = powerbi.DataView
 import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject
+import DataViewObjects = powerbi.DataViewObjects
+
+import DataViewValueColumns = powerbi.DataViewValueColumns
+import DataViewValueColumnGroup = powerbi.DataViewValueColumnGroup
+import DataViewObjectPropertyIdentifier = powerbi.DataViewObjectPropertyIdentifier
 
 import { SpeckleDataInput, SpeckleSelectionData } from './types'
 import { VisualUpdateTypeToString, cleanupDataColumnName } from './utils'
@@ -22,6 +27,7 @@ import ViewerHandler from './handlers/viewerHandler'
 import LandingPageHandler from './handlers/landingPageHandler'
 import TooltipHandler from './handlers/tooltipHandler'
 import SelectionHandler from './handlers/selectionHandler'
+import { ColorHelper } from 'powerbi-visuals-utils-colorutils'
 
 export class Visual implements IVisual {
   private target: HTMLElement
@@ -55,8 +61,7 @@ export class Visual implements IVisual {
       this.tooltipHandler.move()
     }, 1000.0 / 60.0).bind(this)
     this.viewerHandler.OnObjectClicked = this.onObjectClicked.bind(this)
-    this.viewerHandler.OnObjectDoubleClicked = this.selectionHandler.showContextMenu.bind(this)
-    console.log(' - Settings')
+    this.viewerHandler.OnObjectDoubleClicked = this.selectionHandler.showContextMenu
     this.tooltipHandler.PingScreenPosition = this.viewerHandler.getScreenPosition
 
     SpeckleVisualSettings.OnSettingsChanged = ((oldSettings, newSettings) => {
@@ -70,8 +75,8 @@ export class Visual implements IVisual {
   }
 
   private validateOptions(options: VisualUpdateOptions): SpeckleDataInput {
+    console.log('Validating input', options)
     if (options.dataViews.length == 0) throw new Error('No Data View was provided')
-    if (options.dataViews.length > 1) throw new Error('More than one Data View was provided')
     const categoricalView = options.dataViews[0].categorical
     if (!categoricalView) throw new Error('Data View provided is not Categorical')
 
@@ -85,12 +90,13 @@ export class Visual implements IVisual {
 
     const objectColorByColumn = categoricalView.values.find((v) => v.source.roles.objectColorBy)
     const objectDataColumns = categoricalView.values.filter((v) => v.source.roles.objectData)
-
+    const valueColumns = categoricalView.values
     return {
       streamUrlColumn,
       objectIdColumn,
       objectDataColumns,
-      objectColorByColumn
+      objectColorByColumn,
+      valueColumns
     }
   }
 
@@ -122,10 +128,10 @@ export class Visual implements IVisual {
 
     console.log(
       `Update was called with update type ${VisualUpdateTypeToString(options.type)}`,
-      options,
       input,
       SpeckleVisualSettings.current
     )
+
     try {
       switch (options.type) {
         case powerbi.VisualUpdateType.Resize:
@@ -141,7 +147,7 @@ export class Visual implements IVisual {
           this.debounceUpdate(input)
       }
     } catch (error) {
-      console.error('Data update error', error)
+      console.error('Data update error', error ?? 'Unknown')
     }
   }
 
@@ -155,6 +161,7 @@ export class Visual implements IVisual {
     var objectsToUnload = this.findObjectsToUnload(objectUrls)
 
     console.log(`Viewer loading ${objectUrls.length} and unloading ${objectsToUnload.length}`)
+    console.log(this.viewerHandler)
     if (objectsToUnload.length > 0) await this.viewerHandler.unloadObjects(objectsToUnload, signal)
     await this.viewerHandler.loadObjects(
       objectUrls,
@@ -162,7 +169,7 @@ export class Visual implements IVisual {
       this.onError,
       (url) => {
         var exists = this.selectionHandler.has(url)
-        console.log('Checking for object existing', this, url, exists)
+        console.log('Checking for object existing', url, exists)
         return exists
       },
       signal
@@ -181,13 +188,26 @@ export class Visual implements IVisual {
 
     // Any of the two is not null, so we can highlight items
     var highlightedValues = (input.objectColorByColumn ?? input.objectDataColumns[0]).highlights
+    console.log('Highlighting objects', highlightedValues)
     this.viewerHandler.highlightObjects(highlightedValues, objectIdCategory)
 
     // If colorBy column exists, we apply color to the model
     if (input.objectColorByColumn) {
-      var name = input.objectColorByColumn.source.displayName
+      //@ts-ignore
+      var palette = this.host.colorPalette
+      console.log('Coloring objects', palette)
+      let colorHelper: ColorHelper = new ColorHelper(palette)
+
+      let color = colorHelper.getColorForSeriesValue(null, 'WC')
+      let color2 = colorHelper.getColorForSeriesValue(null, 'Hall')
+      let color3 = colorHelper.getColorForSeriesValue(null, 'Office')
+      console.log('color for measure', color, color2, color3)
+
+      var expr = input.objectColorByColumn.source.expr
+      var ref = expr['ref'] ?? expr['arg']['ref'] // Not sure why this class has no autocomplete
+      console.log('ref', ref)
       this.viewerHandler.colorObjects(
-        cleanupDataColumnName(name),
+        cleanupDataColumnName(ref),
         SpeckleVisualSettings.current.color.getColorList()
       )
     } else {
@@ -241,7 +261,7 @@ export class Visual implements IVisual {
   }, 500)
 
   private onObjectClicked(hit?) {
-    console.log('Object was clicked', hit, this)
+    console.log('Object was clicked', hit)
     if (hit) {
       var selectionId = this.selectionHandler.getData(hit.guid)
       const screenLoc = this.viewerHandler.getScreenPosition(hit.point)
@@ -254,11 +274,11 @@ export class Visual implements IVisual {
   }
 
   private onLoad(url: string, index: number) {
-    console.log(`Loaded object ${url} with index ${index}`)
+    //console.log(`Loaded object ${url} with index ${index}`)
   }
 
   private onError(url: string, error: Error) {
-    console.log(`Error loading object ${url} with error`, error)
+    console.warn(`Error loading object ${url} with error`, error)
     //@ts-ignore
     this.host?.displayWarningIcon(
       'Load error',

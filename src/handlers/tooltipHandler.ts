@@ -31,7 +31,7 @@ export default class TooltipHandler {
       const url = `${stream}/object/${object}`
       const tooltipData: IViewerTooltipData[] = objectDataColumns.map((col) => ({
         displayName: cleanupDataColumnName(col.source.displayName),
-        value: col.values[index].toString()
+        value: col.values[index]?.toString() ?? 'Null'
       }))
       this.data.set(url, tooltipData)
     }

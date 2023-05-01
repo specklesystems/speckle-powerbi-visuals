@@ -12,6 +12,7 @@ export type SpeckleDataInput = {
   objectIdColumn: powerbi.DataViewCategoryColumn
   objectDataColumns?: powerbi.DataViewValueColumn[]
   objectColorByColumn?: powerbi.DataViewValueColumn
+  valueColumns: powerbi.DataViewValueColumns
 }
 
 export interface SpeckleTooltip {

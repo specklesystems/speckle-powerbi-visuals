@@ -14,20 +14,18 @@ import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInst
 import VisualObjectInstance = powerbi.VisualObjectInstance
 import DataView = powerbi.DataView
 import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject
-import DataViewObjects = powerbi.DataViewObjects
+import IColorPalette = powerbi.extensibility.IColorPalette
 
-import DataViewValueColumns = powerbi.DataViewValueColumns
-import DataViewValueColumnGroup = powerbi.DataViewValueColumnGroup
-import DataViewObjectPropertyIdentifier = powerbi.DataViewObjectPropertyIdentifier
-
-import { SpeckleDataInput, SpeckleSelectionData } from './types'
+import { FormattingSettingsService } from 'powerbi-visuals-utils-formattingmodel'
+import { IViewerTooltip, IViewerTooltipData, SpeckleDataInput, SpeckleSelectionData } from './types'
 import { VisualUpdateTypeToString, cleanupDataColumnName } from './utils'
 import { SpeckleVisualSettings } from './settings'
 import ViewerHandler from './handlers/viewerHandler'
 import LandingPageHandler from './handlers/landingPageHandler'
 import TooltipHandler from './handlers/tooltipHandler'
 import SelectionHandler from './handlers/selectionHandler'
-import { ColorHelper } from 'powerbi-visuals-utils-colorutils'
+import { SpeckleVisualSettingsModel } from './visualSettingsModel'
+import { SelectionEvent } from '@speckle/viewer'
 
 export class Visual implements IVisual {
   private target: HTMLElement
@@ -38,6 +36,9 @@ export class Visual implements IVisual {
   private landingPageHandler: LandingPageHandler
   private tooltipHandler: TooltipHandler
 
+  private formattingSettings: SpeckleVisualSettingsModel
+  private formattingSettingsService: FormattingSettingsService
+
   private updateTask: Promise<void>
   private ac = new AbortController()
 
@@ -46,12 +47,16 @@ export class Visual implements IVisual {
     Tracker.loaded()
     this.host = options.host
     this.target = options.element
+    this.formattingSettingsService = new FormattingSettingsService()
+
+    //@ts-ignore
+    var palette: IColorPalette = this.host.colorPalette
 
     console.log(' - Init handlers')
     //@ts-ignore
     this.selectionHandler = new SelectionHandler(this.host)
     this.landingPageHandler = new LandingPageHandler(this.target)
-    this.viewerHandler = new ViewerHandler(this.target)
+    this.viewerHandler = new ViewerHandler(this.target, palette)
     //@ts-ignore
     this.tooltipHandler = new TooltipHandler(this.host.tooltipService as ITooltipService)
 
@@ -61,8 +66,16 @@ export class Visual implements IVisual {
       this.tooltipHandler.move()
     }, 1000.0 / 60.0).bind(this)
     this.viewerHandler.OnObjectClicked = this.onObjectClicked.bind(this)
-    this.viewerHandler.OnObjectDoubleClicked = this.selectionHandler.showContextMenu
-    this.tooltipHandler.PingScreenPosition = this.viewerHandler.getScreenPosition
+    this.viewerHandler.OnObjectRightClicked = (hit, multi) => {
+      this.selectionHandler.showContextMenu(hit)
+    }
+    this.viewerHandler.OnObjectDoubleClicked = this.onObjectDoubleClicked.bind(this)
+    this.tooltipHandler.PingScreenPosition = this.viewerHandler.getScreenPosition.bind(
+      this.viewerHandler
+    )
+    this.selectionHandler.PingScreenPosition = this.viewerHandler.getScreenPosition.bind(
+      this.viewerHandler
+    )
 
     SpeckleVisualSettings.OnSettingsChanged = ((oldSettings, newSettings) => {
       this.viewerHandler.changeSettings(oldSettings, newSettings)
@@ -74,45 +87,122 @@ export class Visual implements IVisual {
     console.log('Visual setup finished')
   }
 
-  private validateOptions(options: VisualUpdateOptions): SpeckleDataInput {
-    console.log('Validating input', options)
-    if (options.dataViews.length == 0) throw new Error('No Data View was provided')
-    const categoricalView = options.dataViews[0].categorical
-    if (!categoricalView) throw new Error('Data View provided is not Categorical')
+  private onObjectDoubleClicked(args: SelectionEvent) {
+    console.log('DOUBLE CLICKED', args)
+  }
+  private validateMatrixView(options: VisualUpdateOptions): any {
+    const matrixVew = options.dataViews[0].matrix
+    console.log('Validating matrix view', matrixVew)
+    if (!matrixVew) throw new Error('Data does not contain a matrix data view')
 
-    const streamUrlColumn = categoricalView.categories.find((c) => c.source.roles.stream)
-    const objectIdColumn = categoricalView.categories.find((c) => c.source.roles.object)
+    var hasStream = false,
+      hasParentObject = false,
+      hasObject = false,
+      hasColorFilter = false
 
-    if (!streamUrlColumn && !objectIdColumn)
-      throw new Error('Input is missing Stream ID and Object ID fields')
-    else if (!streamUrlColumn) throw new Error('Input is missing Stream ID field')
-    else if (!objectIdColumn) throw new Error('Input is missing Object ID field')
+    matrixVew.rows.levels.forEach((level) => {
+      level.sources.forEach((source) => {
+        if (!hasStream) hasStream = source.roles['stream'] != undefined
+        if (!hasParentObject) hasParentObject = source.roles['parentObject'] != undefined
+        if (!hasObject) hasObject = source.roles['object'] != undefined
+        if (!hasColorFilter) hasColorFilter = source.roles['objectColorBy'] != undefined
+      })
+    })
 
-    const objectColorByColumn = categoricalView.values.find((v) => v.source.roles.objectColorBy)
-    const objectDataColumns = categoricalView.values.filter((v) => v.source.roles.objectData)
-    const valueColumns = categoricalView.values
+    if (!hasStream) throw new Error('Missing Stream ID input')
+    if (!hasParentObject) throw new Error('Missing Commit Object ID input')
+    if (!hasObject) throw new Error('Missing Object Id input')
+
+    var objectUrlsToLoad = []
+    var objectIds = []
+    var selectedIds = []
+    var colorByIds = []
+    var objectTooltipData = new Map<string, IViewerTooltip>()
+
+    //this.selectionHandler.clear()
+
+    matrixVew.rows.root.children.forEach((streamUrlChild) => {
+      var url = streamUrlChild.value
+
+      streamUrlChild.children?.forEach((parentObjectIdChild) => {
+        var parentId = parentObjectIdChild.value
+        objectUrlsToLoad.push(`${url}/objects/${parentId}`)
+
+        parentObjectIdChild.children?.forEach((colorByChild) => {
+          //@ts-ignore
+          var color = this.host.colorPalette?.getColor(colorByChild.value as string)
+          var colorGroup = {
+            color: color.value,
+            objectIds: []
+          }
+
+          colorByChild.children?.forEach((objectIdChild) => {
+            var objId = objectIdChild.value as string
+            objectIds.push(`${objId}`)
+            colorGroup.objectIds.push(objId)
+
+            // Create selection IDs for each object
+            const nodeSelection = this.host
+              //@ts-ignore
+              .createSelectionIdBuilder()
+              .withMatrixNode(objectIdChild, matrixVew.rows.levels)
+              .createSelectionId()
+            this.selectionHandler.set(objId, nodeSelection)
+
+            // Create value records for the tooltips
+            if (objectIdChild.values) {
+              var objectData: IViewerTooltipData[] = []
+              Object.keys(objectIdChild.values).forEach((key) => {
+                var value: powerbi.DataViewMatrixNodeValue = objectIdChild.values[key]
+                var k: unknown = key
+                var colInfo = matrixVew.valueSources[k as number]
+                var isHighlighted = value.highlight != undefined && value.highlight != null
+                if (isHighlighted) {
+                  selectedIds.push(objId)
+                }
+                var propData: IViewerTooltipData = {
+                  displayName: colInfo.displayName,
+                  value: value.value.toString()
+                }
+                objectData.push(propData)
+              })
+              objectTooltipData.set(objId, { selectionId: nodeSelection, data: objectData })
+            }
+          })
+          colorByIds.push(colorGroup)
+        })
+      })
+    })
+    console.log(objectUrlsToLoad)
+
     return {
-      streamUrlColumn,
-      objectIdColumn,
-      objectDataColumns,
-      objectColorByColumn,
-      valueColumns
+      objectsToLoad: objectUrlsToLoad,
+      objectIds,
+      selectedIds,
+      colorByIds,
+      objectTooltipData,
+      view: matrixVew
     }
   }
 
   public update(options: VisualUpdateOptions) {
     console.log('Data update')
     var newSettings = Visual.parseSettings(options && options.dataViews && options.dataViews[0])
-    SpeckleVisualSettings.handleSettingsUpdate(newSettings)
+    //SpeckleVisualSettings.handleSettingsUpdate(newSettings)
+    this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
+      SpeckleVisualSettingsModel,
+      options.dataViews
+    )
+    SpeckleVisualSettings.handleSettingsModelUpdate(this.formattingSettings)
 
     try {
-      var input = this.validateOptions(options)
-      console.log('input validated', input)
+      var input = this.validateMatrixView(options)
+      console.log('INPUT: ✅ Valid', input)
       this.landingPageHandler.hide()
     } catch (e) {
-      console.log('validation went wrong', e)
-      this.viewerHandler.clear()
+      console.log('INPUT: ❌ Not valid', e)
       this.landingPageHandler.show()
+      this.selectionHandler.clear()
       //@ts-ignore
       this.host.displayWarningIcon(
         `Incomplete data input.`,
@@ -141,9 +231,8 @@ export class Visual implements IVisual {
         case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
           return
         default:
-          this.selectionHandler.setup(input)
-          this.tooltipHandler.setup(options.dataViews[0].categorical)
-          console.log('Update data call')
+          //this.selectionHandler.setup(input)
+          this.tooltipHandler.setup(input.objectTooltipData)
           this.debounceUpdate(input)
       }
     } catch (error) {
@@ -151,79 +240,29 @@ export class Visual implements IVisual {
     }
   }
 
-  private async handleDataUpdate(input: SpeckleDataInput, signal: AbortSignal) {
-    var streamCategory = input.streamUrlColumn.values
-    var objectIdCategory = input.objectIdColumn.values
-
-    var objectUrls = streamCategory.map(
-      (stream, index) => `${stream}/objects/${objectIdCategory[index]}`
-    )
-    var objectsToUnload = this.findObjectsToUnload(objectUrls)
-
-    console.log(`Viewer loading ${objectUrls.length} and unloading ${objectsToUnload.length}`)
-    console.log(this.viewerHandler)
-    if (objectsToUnload.length > 0) await this.viewerHandler.unloadObjects(objectsToUnload, signal)
-    await this.viewerHandler.loadObjects(
-      objectUrls,
-      this.onLoad,
-      this.onError,
-      (url) => {
-        var exists = this.selectionHandler.has(url)
-        console.log('Checking for object existing', url, exists)
-        return exists
-      },
-      signal
-    )
-
-    if (signal?.aborted) return
-    Tracker.dataReload()
-
-    // Viewer has finished loading, now we handle coloring and highlight
-
-    if (!input.objectDataColumns && !input.objectColorByColumn) {
-      // No extra data, clear pre-existing filters.
-      this.viewerHandler.resetFilters()
-      return
+  private async handleDataUpdate(input: any, signal: AbortSignal) {
+    if (input.objectsToLoad) {
+      this.updateTask = this.viewerHandler
+        .loadObjects(input.objectsToLoad, this.onLoad, this.onError, signal)
+        .then(async () => {
+          console.log('Filtering objects from table', input)
+          await this.viewerHandler.colorObjectsByGroup(input.colorByIds)
+          if (input.selectedIds.length == 0) {
+            console.log('Isolating complete input')
+            await this.viewerHandler.isolateObjects(input.objectIds, true)
+          } else {
+            await this.viewerHandler.selectObjects(input.selectedIds)
+            // TODO: Check why this doesn't work with Alex or Dim
+            // console.log('Isolating input selection', input.selectedIds, input.objectIds)
+            // await this.viewerHandler.unIsolateObjects(input.objectIds)
+            // await this.viewerHandler.isolateObjects(input.selectedIds, true)
+            // console.log('Finished isolation selection')
+          }
+        })
+        .catch((e) => {
+          console.error(`Error loading objects: ${e}`)
+        })
     }
-
-    // Any of the two is not null, so we can highlight items
-    var highlightedValues = (input.objectColorByColumn ?? input.objectDataColumns[0]).highlights
-    console.log('Highlighting objects', highlightedValues)
-    this.viewerHandler.highlightObjects(highlightedValues, objectIdCategory)
-
-    // If colorBy column exists, we apply color to the model
-    if (input.objectColorByColumn) {
-      //@ts-ignore
-      var palette = this.host.colorPalette
-      console.log('Coloring objects', palette)
-      let colorHelper: ColorHelper = new ColorHelper(palette)
-
-      let color = colorHelper.getColorForSeriesValue(null, 'WC')
-      let color2 = colorHelper.getColorForSeriesValue(null, 'Hall')
-      let color3 = colorHelper.getColorForSeriesValue(null, 'Office')
-      console.log('color for measure', color, color2, color3)
-
-      var expr = input.objectColorByColumn.source.expr
-      var ref = expr['ref'] ?? expr['arg']['ref'] // Not sure why this class has no autocomplete
-      console.log('ref', ref)
-      this.viewerHandler.colorObjects(
-        cleanupDataColumnName(ref),
-        SpeckleVisualSettings.current.color.getColorList()
-      )
-    } else {
-      this.viewerHandler.clearColors()
-    }
-  }
-
-  private findObjectsToUnload(objectUrls: string[]) {
-    var objectsToUnload = []
-    for (const key of this.selectionHandler.urls()) {
-      const found = objectUrls.find((url) => url == key)
-      if (!found) {
-        objectsToUnload.push(key)
-      }
-    }
-    return objectsToUnload
   }
 
   private static parseSettings(dataView: DataView): SpeckleVisualSettings {
@@ -244,7 +283,11 @@ export class Visual implements IVisual {
     )
   }
 
-  private debounceUpdate = _.debounce((input: SpeckleDataInput) => {
+  public getFormattingModel(): powerbi.visuals.FormattingModel {
+    return this.formattingSettingsService.buildFormattingModel(this.formattingSettings)
+  }
+
+  private debounceUpdate = _.throttle((input: SpeckleDataInput) => {
     this.viewerHandler.init().then(async (_) => {
       if (this.updateTask) {
         this.ac.abort()
@@ -260,21 +303,21 @@ export class Visual implements IVisual {
     })
   }, 500)
 
-  private onObjectClicked(hit?) {
-    console.log('Object was clicked', hit)
+  private onObjectClicked(hit, multi) {
+    console.log('Object was clicked', hit?.object)
     if (hit) {
-      var selectionId = this.selectionHandler.getData(hit.guid)
       const screenLoc = this.viewerHandler.getScreenPosition(hit.point)
-      console.log('showing tooltip', selectionId, screenLoc)
-      //this.tooltipHandler.show(hit, selectionData, screenLoc)
-      this.selectionHandler.select(hit.guid)
+      console.log('showing tooltip', screenLoc)
+      this.selectionHandler.select(hit.object.id, multi)
+      this.tooltipHandler.show(hit, screenLoc)
     } else {
       this.selectionHandler.clear()
+      this.tooltipHandler.hide()
     }
   }
 
   private onLoad(url: string, index: number) {
-    //console.log(`Loaded object ${url} with index ${index}`)
+    console.log(`Loaded object ${url} with index ${index}`)
   }
 
   private onError(url: string, error: Error) {

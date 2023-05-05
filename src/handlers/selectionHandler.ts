@@ -29,20 +29,22 @@ export default class SelectionHandler {
     }
   }
   public showContextMenu(hit) {
+    console.log('showing context menu for hit')
     var loc = this.PingScreenPosition(hit.point)
-    var selectionId = this.selectionIdMap.get(hit.guid)
+    var selectionId = this.selectionIdMap.get(hit.object.id)
     this.selectionManager.showContextMenu(selectionId, loc)
   }
 
   public set(url: string, data: powerbi.extensibility.ISelectionId) {
     this.selectionIdMap.set(url, data)
   }
-  public select(url: string) {
-    this.selectionManager.select(this.selectionIdMap.get(url), false)
+  public select(url: string, multi: boolean = false) {
+    this.selectionManager.select(this.selectionIdMap.get(url), multi)
   }
 
   public clear() {
     this.selectionManager.clear()
+    //this.selectionIdMap = new Map<string, powerbi.extensibility.ISelectionId>()
   }
 
   public getData(url: string) {

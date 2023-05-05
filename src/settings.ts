@@ -3,6 +3,7 @@
 import { dataViewObjectsParser } from 'powerbi-visuals-utils-dataviewutils'
 import DataViewObjectsParser = dataViewObjectsParser.DataViewObjectsParser
 import _ from 'lodash'
+import { SpeckleVisualSettingsModel } from './visualSettingsModel'
 
 export class CameraSettings {
   // Default color
@@ -39,5 +40,10 @@ export class SpeckleVisualSettings extends DataViewObjectsParser {
     if (same) return
     this.OnSettingsChanged(this.current, newSettings)
     this.current = newSettings
+  }
+
+  public static async handleSettingsModelUpdate(newSettings: SpeckleVisualSettingsModel) {
+    console.log('Handle settings model update', newSettings)
+    this.current.color.background = newSettings.colorsCard.backgroundColorSlice.value.value
   }
 }

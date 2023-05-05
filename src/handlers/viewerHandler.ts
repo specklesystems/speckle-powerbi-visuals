@@ -1,8 +1,17 @@
-import { CanonicalView, PropertyInfo, Viewer, ViewerEvent } from '@speckle/viewer'
+import {
+  CanonicalView,
+  FilteringState,
+  PropertyInfo,
+  Viewer,
+  ViewerEvent,
+  SelectionEvent
+} from '@speckle/viewer'
 import { projectToScreen } from '../utils'
-import interpolate from 'color-interpolate'
 import { SpeckleVisualSettings } from '../settings'
 import { SettingsChangedType, Tracker } from '../mixpanel'
+
+import IColorPalette = powerbi.extensibility.IColorPalette
+import { keys } from 'lodash'
 
 export default class ViewerHandler {
   private viewer: Viewer
@@ -10,14 +19,20 @@ export default class ViewerHandler {
   private batchSize: number = 25
   private parent: HTMLElement
   private authToken: string = null //TODO: See what can be done to enable private stream fetching.
+  private palette: IColorPalette
+  private currentSelection: Set<string> = new Set<string>()
+  public loadedObjectsCache: Set<string> = new Set<string>()
 
-  public constructor(parent: HTMLElement) {
+  public constructor(parent: HTMLElement, palette: IColorPalette) {
     this.parent = parent
     this.promises = []
+    this.palette = palette
   }
+  public state: FilteringState
 
-  public OnObjectClicked: (hit?: any) => void
-  public OnObjectDoubleClicked: (hit?: any) => void
+  public OnObjectClicked: (hit: any, multi: boolean) => void
+  public OnObjectRightClicked: (hit: any, multi: boolean) => void
+  public OnObjectDoubleClicked: (hit: any) => void
   public OnCameraUpdate: () => void
 
   public changeSettings(oldSettings: SpeckleVisualSettings, newSettings: SpeckleVisualSettings) {
@@ -47,8 +62,8 @@ export default class ViewerHandler {
     await viewer.init()
 
     // Setup any events here (progress, load-complete...)
-    viewer.on(ViewerEvent.ObjectClicked, this.objectClicked.bind(this))
     viewer.on(ViewerEvent.ObjectDoubleClicked, this.objectDoubleClicked.bind(this))
+    viewer.on(ViewerEvent.ObjectClicked, this.objectClicked.bind(this))
     viewer.cameraHandler.controls.addEventListener('update', this.onCameraUpdate.bind(this))
 
     this.viewer = viewer
@@ -60,18 +75,45 @@ export default class ViewerHandler {
   }
 
   private objectDoubleClicked(arg: any) {
-    if (!arg) return
-    var hit = arg.hits[0]
+    console.log('Double clicked', arg)
+    var hit = this.getFirstViewableHit(arg)
     if (this.OnObjectDoubleClicked) this.OnObjectDoubleClicked(hit)
   }
-  private objectClicked(arg: any) {
+  private async objectClicked(arg: SelectionEvent) {
     console.log('viewer clicked event', arg)
-    var hit = arg?.hits[0]
-    if (!hit) {
-      this.viewer.resetSelection()
+    var button = arg?.event?.button ?? 0
+    var multi = arg?.event?.ctrlKey ?? false
+    var hit = this.getFirstViewableHit(arg)
+
+    if (button == 2) {
+      if (this.OnObjectRightClicked) this.OnObjectRightClicked(hit, multi)
+    } else if (button == 0) {
+      if (this.OnObjectClicked) this.OnObjectClicked(hit, multi)
+
+      if (hit && multi) {
+        this.currentSelection.add(hit.object.id)
+      } else if (hit && !multi) {
+        this.currentSelection.clear()
+        this.currentSelection.add(hit.object.id)
+      } else if (!multi) {
+        this.currentSelection.clear()
+      }
+
+      await this.selectObjects([...this.currentSelection.keys()])
     }
-    if (this.OnObjectClicked) this.OnObjectClicked(hit)
-    this.selectObjects(hit ? [hit.object.id] : null)
+  }
+
+  private getFirstViewableHit(arg: SelectionEvent) {
+    var hit = null
+    if (this.state?.isolatedObjects) {
+      // Find the first hit contained in the isolated objects
+      hit = arg?.hits.find((hit) => {
+        var hitId = hit.object.id as string
+        return this.state.isolatedObjects.includes(hitId)
+      })
+      if (hit) console.log('Found viewable hit', hit)
+    }
+    return hit
   }
 
   public async unloadObjects(
@@ -92,86 +134,91 @@ export default class ViewerHandler {
     }
   }
 
-  public loadedObjectsCache: Set<string> = new Set<string>()
-
   public async loadObjects(
     objectUrls: string[],
     onLoad: (url: string, index: number) => void,
     onError: (url: string, error: Error) => void,
-    doesObjectExist: (url: string) => boolean,
     signal: AbortSignal
   ) {
-    var index = 0
-    for (const url of objectUrls) {
-      if (signal?.aborted) return
-      if (!this.loadedObjectsCache.has(url)) {
-        var promise = this.viewer
-          .loadObject(url, this.authToken, false)
-          .catch((e: Error) => onError(url, e))
-          .finally(() => {
-            if (!this.loadedObjectsCache.has(url)) this.loadedObjectsCache.add(url)
-          })
-        this.promises.push(promise)
-        if (this.promises.length == this.batchSize) {
-          await Promise.all(this.promises)
-          this.promises = []
+    console.groupCollapsed('Loading objects')
+    try {
+      var index = 0
+      for (const url of objectUrls) {
+        if (signal?.aborted) return
+        console.log('Attempting to load', url)
+        if (!this.loadedObjectsCache.has(url)) {
+          console.log('Object is not in cache')
+          var promise = this.viewer
+            .loadObjectAsync(url, this.authToken, false)
+            .then(() => onLoad(url, index++))
+            .catch((e: Error) => onError(url, e))
+            .finally(() => {
+              if (!this.loadedObjectsCache.has(url)) this.loadedObjectsCache.add(url)
+            })
+          this.promises.push(promise)
+          if (this.promises.length == this.batchSize) {
+            //this.promises.push(Promise.resolve(this.later(1000)))
+            await Promise.all(this.promises)
+            this.promises = []
+          }
+        } else {
+          console.log('Object was already in cache')
         }
       }
-      onLoad(url, index++)
-    }
-    await Promise.all(this.promises)
-    this.promises = []
-  }
-
-  public async highlightObjects(
-    highlightedValues: powerbi.PrimitiveValue[],
-    objectIdColumn: powerbi.PrimitiveValue[]
-  ) {
-    var objectIds = highlightedValues
-      ? highlightedValues
-          .map((value, index) => (value ? objectIdColumn[index].toString() : null))
-          .filter((e) => e != null)
-      : null
-    console.log('object ids', objectIds)
-    if (objectIds) {
-      await this.viewer.resetFilters()
-      await this.viewer.isolateObjects(objectIds, null, true, true)
-      console.log('isolated filters')
-    } else {
-      await this.viewer.resetFilters()
-      console.log('reset filters')
+      await Promise.all(this.promises).finally(() => (this.promises = []))
+    } catch (error) {
+      throw new Error(`Load objects failed: ${error}`)
+    } finally {
+      console.groupEnd()
     }
   }
 
-  public async clearColors() {
-    await this.viewer.removeColorFilter()
-  }
-
-  public async colorObjects(propertyName: string, colorList: any) {
-    console.log('Coloring objects by', propertyName)
-
-    var props = this.viewer.getObjectProperties(null, true)
-    if (props.length == 0) return
-    var prop = props.find((item) => {
-      return item.key == propertyName
+  private later(delay) {
+    return new Promise<void>((resolve) => {
+      setTimeout(() => resolve(), delay)
     })
-    console.log('Prop to color by', prop)
-    if (prop.type == 'number') {
-      var groups = this.getCustomColorGroups(prop, colorList)
-      //@ts-ignore
-      await this.viewer.setUserObjectColors(groups)
-      console.log('applied numeric filter')
+  }
+
+  public async highlightObjects(objectIds: string[]) {
+    if (objectIds) {
+      await this.viewer.highlightObjects(objectIds, true)
+      console.log('highlighted objects', objectIds)
     } else {
-      await this.viewer.setColorFilter(prop).catch(async (e) => {
-        console.warn('Filter failed to be applied. Filter will be reset', e)
-        return await this.viewer.removeColorFilter()
-      })
-      console.log('applied property filter')
+      await this.viewer.resetHighlight()
+      console.log('reset highlight')
     }
+  }
+  private keySuffix: number = 0
+  public async unIsolateObjects(objectIds: string[]) {
+    console.log('UnIsolating objects', 'powerbi' + this.keySuffix, objectIds.length)
+    this.state = await this.viewer.unIsolateObjects(objectIds, 'powerbi' + this.keySuffix, true)
+  }
+  public async isolateObjects(objectIds, ghost: boolean = false) {
+    console.log('Isolating objects', 'powerbi' + this.keySuffix, objectIds.length, ghost)
+    this.keySuffix++
+    this.state = await this.viewer.isolateObjects(
+      objectIds,
+      'powerbi' + this.keySuffix,
+      true,
+      ghost
+    )
+  }
+
+  public async colorObjectsByGroup(
+    groups?: {
+      objectIds: string[]
+      color: string
+    }[]
+  ) {
+    if (!groups) this.state = await this.viewer.removeColorFilter()
+    else
+      this.state = await this.viewer
+        //@ts-ignore
+        .setUserObjectColors(groups)
   }
 
   public async resetFilters(zoomExtents: boolean = false) {
-    await this.viewer.resetFilters()
+    this.state = await this.viewer.resetFilters()
     if (zoomExtents) this.viewer.zoom()
   }
 
@@ -180,30 +227,13 @@ export default class ViewerHandler {
   }
 
   public async selectObjects(objectIds: string[] = null) {
-    if (objectIds == null) this.viewer.resetSelection()
-    else this.viewer.selectObjects(objectIds)
+    this.currentSelection.clear()
+    objectIds?.forEach((id) => this.currentSelection.add(id))
+    this.state = await this.viewer.selectObjects(objectIds ?? [])
   }
 
   public getScreenPosition(worldPosition): { x: number; y: number } {
-    console.log('Getting screen position')
     return projectToScreen(this.viewer.cameraHandler.camera, worldPosition)
-  }
-
-  private getCustomColorGroups(prop: PropertyInfo, customColors: string[]) {
-    var groups: [{ value: number; id?: string; ids?: string[] }] =
-      //@ts-ignore
-      prop.valueGroups
-    if (!groups) return null
-    var colorGrad = interpolate(customColors)
-    return groups.map((group) => {
-      //@ts-ignore
-      var color = colorGrad((group.value - prop.min) / (prop.max - prop.min))
-      var objectIds = group.ids ?? [group.id]
-      return {
-        objectIds,
-        color
-      }
-    })
   }
 
   private createContainerDiv(parent: HTMLElement) {

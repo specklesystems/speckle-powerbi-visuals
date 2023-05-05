@@ -7,6 +7,12 @@ export type IViewerTooltipData = {
   displayName: string
   value: string
 }
+
+export type IViewerTooltip = {
+  selectionId: powerbi.extensibility.ISelectionId
+  data: IViewerTooltipData[]
+}
+
 export type SpeckleDataInput = {
   streamUrlColumn: powerbi.DataViewCategoryColumn
   objectIdColumn: powerbi.DataViewCategoryColumn

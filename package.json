@@ -22,6 +22,7 @@
     "powerbi-visuals-api": "~5.3.0",
     "powerbi-visuals-utils-colorutils": "^6.0.1",
     "powerbi-visuals-utils-dataviewutils": "6.0.1",
+    "powerbi-visuals-utils-formattingmodel": "^5.0.0",
     "powerbi-visuals-utils-interactivityutils": "^6.0.2",
     "powerbi-visuals-utils-tooltiputils": "^6.0.1",
     "regenerator-runtime": "^0.13.11"

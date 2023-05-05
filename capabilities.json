@@ -2,29 +2,34 @@
   "dataRoles": [
     {
       "displayName": "Stream URL",
-      "name": "stream",
-      "kind": "Grouping"
+      "kind": "Grouping",
+      "name": "stream"
+    },
+    {
+      "displayName": "Commit Object ID",
+      "kind": "Grouping",
+      "name": "parentObject"
     },
     {
       "displayName": "Object ID",
-      "name": "object",
-      "kind": "GroupingOrMeasure"
+      "kind": "Grouping",
+      "name": "object"
     },
     {
       "displayName": "Color By",
-      "name": "objectColorBy",
-      "kind": "Measure"
+      "kind": "GroupingOrMeasure",
+      "name": "objectColorBy"
     },
     {
       "displayName": "Tooltip Data",
-      "name": "objectData",
-      "kind": "Measure"
+      "kind": "Measure",
+      "name": "objectData"
     }
   ],
   "dataViewMappings": [
     {
-      "categorical": {
-        "categories": {
+      "matrix": {
+        "rows": {
           "select": [
             {
               "for": {
@@ -33,48 +38,37 @@
             },
             {
               "for": {
-                "in": "object"
+                "in": "parentObject"
               }
             },
             {
               "for": {
                 "in": "objectColorBy"
               }
+            },
+            {
+              "for": {
+                "in": "object"
+              }
             }
-          ],
-          "dataReductionAlgorithm": {
-            "top": {
-              "count": 30000
-            }
-          }
+          ]
         },
         "values": {
-          "select": [{ "for": { "in": "objectData" } }]
+          "select": [
+            {
+              "bind": {
+                "to": "objectData"
+              }
+            }
+          ]
         }
       }
     }
   ],
-  "supportsHighlight": true,
-  "supportsMultiVisualSelection": true,
-  "suppressDefaultTitle": true,
-  "supportsSynchronizingFilterState": true,
-  "supportsLandingPage": true,
-  "supportsEmptyDataView": true,
-  "supportsKeyboardFocus": true,
-  "tooltips": {
-    "supportEnhancedTooltips": true
-  },
-  "drilldown": {
-    "roles": ["stream", "object"]
-  },
   "objects": {
     "camera": {
       "displayName": "Camera",
       "properties": {
-        "orthoMode": {
-          "displayName": "Ortho mode",
-          "type": { "bool": true }
-        },
         "defaultView": {
           "displayName": "Default view",
           "type": {
@@ -111,24 +105,20 @@
               }
             ]
           }
+        },
+        "orthoMode": {
+          "displayName": "Ortho mode",
+          "type": {
+            "bool": true
+          }
         }
       }
     },
     "color": {
       "displayName": "Color",
       "properties": {
-        "startColor": {
-          "displayName": "Start Color",
-          "type": {
-            "fill": {
-              "solid": {
-                "color": true
-              }
-            }
-          }
-        },
-        "midColor": {
-          "displayName": "Middle Color",
+        "background": {
+          "displayName": "Background Color",
           "type": {
             "fill": {
               "solid": {
@@ -147,8 +137,18 @@
             }
           }
         },
-        "background": {
-          "displayName": "Background Color",
+        "midColor": {
+          "displayName": "Middle Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "startColor": {
+          "displayName": "Start Color",
           "type": {
             "fill": {
               "solid": {
@@ -162,8 +162,8 @@
   },
   "privileges": [
     {
-      "name": "WebAccess",
       "essential": true,
+      "name": "WebAccess",
       "parameters": [
         "https://speckle.xyz",
         "https://*.speckle.xyz",
@@ -174,8 +174,21 @@
       ]
     },
     {
-      "name": "ExportContent",
-      "essential": false
+      "essential": false,
+      "name": "ExportContent"
     }
-  ]
+  ],
+  "sorting": {
+    "default": {}
+  },
+  "supportsEmptyDataView": true,
+  "supportsHighlight": true,
+  "supportsKeyboardFocus": true,
+  "supportsLandingPage": true,
+  "supportsMultiVisualSelection": true,
+  "supportsSynchronizingFilterState": true,
+  "suppressDefaultTitle": true,
+  "tooltips": {
+    "supportEnhancedTooltips": true
+  }
 }

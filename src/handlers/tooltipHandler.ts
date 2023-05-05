@@ -2,10 +2,10 @@ import powerbi from 'powerbi-visuals-api'
 import ITooltipService = powerbi.extensibility.ITooltipService
 import { cleanupDataColumnName } from '../utils'
 import _ from 'lodash'
-import { IViewerTooltipData, SpeckleTooltip } from '../types'
+import { IViewerTooltip, IViewerTooltipData, SpeckleTooltip } from '../types'
 
 export default class TooltipHandler {
-  private data: Map<string, IViewerTooltipData[]>
+  private data: Map<string, IViewerTooltip>
   private tooltipService: ITooltipService
   public currentTooltip: SpeckleTooltip = null
 
@@ -13,35 +13,24 @@ export default class TooltipHandler {
 
   constructor(tooltipService) {
     this.tooltipService = tooltipService
-    this.data = new Map<string, IViewerTooltipData[]>()
+    this.data = new Map<string, IViewerTooltip>()
   }
 
-  public setup(categoricalView: powerbi.DataViewCategorical) {
-    console.log('Tooltip handler setup', categoricalView)
-    if (!categoricalView.values) return // Stop if no values are added, as there will be no tooltip data
-
-    const streamColumn = categoricalView.categories.find((c) => c.source.roles.stream)
-    const objectColumn = categoricalView.categories.find((c) => c.source.roles.object)
-    const objectDataColumns = categoricalView.values.filter((v) => v.source.roles.objectData)
-
-    this.data = new Map<string, IViewerTooltipData[]>()
-    for (let index = 0; index < streamColumn.values.length; index++) {
-      const stream = streamColumn[index]
-      const object = objectColumn[index]
-      const url = `${stream}/object/${object}`
-      const tooltipData: IViewerTooltipData[] = objectDataColumns.map((col) => ({
-        displayName: cleanupDataColumnName(col.source.displayName),
-        value: col.values[index]?.toString() ?? 'Null'
-      }))
-      this.data.set(url, tooltipData)
-    }
+  public setup(data: Map<string, IViewerTooltip>) {
+    this.data = data
   }
 
-  public show(hit: { guid: string; object: any; point: any }, selectionData, screenLoc) {
+  public show(hit: { guid: string; object: any; point: any }, screenLoc) {
+    console.log('TooltipHandler.Show', hit, screenLoc)
+    var id = hit.object.id as string
+    var objTooltipData: IViewerTooltip = this.data.get(id)
+    console.log('TooltipHandler.Show: data', objTooltipData)
+    if (!objTooltipData) return
+
     const tooltipData = {
       coordinates: [screenLoc.x, screenLoc.y],
-      dataItems: selectionData.data,
-      identities: [selectionData.id],
+      dataItems: objTooltipData.data,
+      identities: [objTooltipData.selectionId],
       isTouchEvent: false
     }
 

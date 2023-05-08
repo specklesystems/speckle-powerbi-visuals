@@ -1,65 +1,51 @@
-import { SpeckleDataInput, SpeckleSelectionData } from '../types'
+import { AsyncSignal } from '../signal'
+import { SpeckleSelectionData } from '../types'
 
 export default class SelectionHandler {
   private selectionIdMap: Map<string, powerbi.extensibility.ISelectionId>
   private selectionManager: powerbi.extensibility.ISelectionManager
-  private host: powerbi.extensibility.IVisualHost
+  private host: powerbi.extensibility.visual.IVisualHost
 
   public PingScreenPosition: (worldPosition) => { x: number; y: number }
+  private onSelection = new AsyncSignal<SelectionHandler, powerbi.extensibility.ISelectionId[]>()
 
-  public constructor(host: powerbi.extensibility.IVisualHost) {
+  public get OnSelectionEvent() {
+    return this.onSelection.expose()
+  }
+
+  public constructor(host: powerbi.extensibility.visual.IVisualHost) {
     this.host = host
-    //@ts-ignore
     this.selectionManager = this.host.createSelectionManager()
     this.selectionIdMap = new Map<string, powerbi.extensibility.ISelectionId>()
+    this.selectionManager.registerOnSelectCallback(async (ids) => {
+      await this.onSelection.triggerAwait(this, ids)
+    })
   }
-  public setup(input: SpeckleDataInput) {
-    var objectUrls = input.streamUrlColumn.values.map(
-      (stream, index) => `${stream}/objects/${input.objectIdColumn.values[index]}`
-    )
-    // We create selection Ids for all objects, regardless if they're there already.
-    for (let i = 0; i < objectUrls.length; i++) {
-      var url = objectUrls[i]
-      //@ts-ignore
-      var selectionBuilder = this.host.createSelectionIdBuilder()
-      var selectionId: powerbi.extensibility.ISelectionId = selectionBuilder
-        .withCategory(input.objectIdColumn, i)
-        .createSelectionId()
-      this.selectionIdMap.set(url, selectionId)
-    }
-  }
+
   public showContextMenu(hit) {
     console.log('showing context menu for hit')
-    var loc = this.PingScreenPosition(hit.point)
-    var selectionId = this.selectionIdMap.get(hit.object.id)
+    const loc = this.PingScreenPosition(hit.point);
+    const selectionId = this.selectionIdMap.get(hit.object.id);
     this.selectionManager.showContextMenu(selectionId, loc)
   }
 
   public set(url: string, data: powerbi.extensibility.ISelectionId) {
     this.selectionIdMap.set(url, data)
   }
-  public select(url: string, multi: boolean = false) {
+  public select(url: string, multi = false) {
     this.selectionManager.select(this.selectionIdMap.get(url), multi)
   }
 
   public clear() {
     this.selectionManager.clear()
-    //this.selectionIdMap = new Map<string, powerbi.extensibility.ISelectionId>()
-  }
-
-  public getData(url: string) {
-    return this.selectionIdMap.get(url)
   }
 
   public reset() {
+    this.clear()
     this.selectionIdMap = new Map<string, SpeckleSelectionData>()
   }
 
   public has(url) {
     return this.selectionIdMap.has(url)
-  }
-
-  public urls() {
-    return this.selectionIdMap.keys()
   }
 }

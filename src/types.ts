@@ -1,4 +1,6 @@
-export type SpeckleSelectionData = {
+
+
+export interface SpeckleSelectionData {
   id: powerbi.extensibility.ISelectionId
   data: IViewerTooltipData[]
 }
@@ -14,11 +16,12 @@ export type IViewerTooltip = {
 }
 
 export type SpeckleDataInput = {
-  streamUrlColumn: powerbi.DataViewCategoryColumn
-  objectIdColumn: powerbi.DataViewCategoryColumn
-  objectDataColumns?: powerbi.DataViewValueColumn[]
-  objectColorByColumn?: powerbi.DataViewValueColumn
-  valueColumns: powerbi.DataViewValueColumns
+  objectsToLoad: string[]
+  objectIds: string[]
+  selectedIds: string[]
+  colorByIds: { objectIds: string[]; color: string }[]
+  objectTooltipData: Map<string, IViewerTooltip>
+  view: powerbi.DataViewMatrix
 }
 
 export interface SpeckleTooltip {

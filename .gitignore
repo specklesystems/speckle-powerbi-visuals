@@ -4,3 +4,4 @@ webpack.statistics.dev.html
 .tmp/
 webpack.statistics.prod.html
 .DS_Store
+.idea/

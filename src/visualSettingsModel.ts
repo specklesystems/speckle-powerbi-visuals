@@ -39,9 +39,9 @@ class SpeckleVisualColorSettingsCard extends FormattingSettingsCard {
     value: { value: SpeckleVisualSettings.current.color.background }
   })
 
-  name: string = 'speckleVisual_colors'
-  displayName: string = 'Colors'
-  analyticsPane: boolean = false
+  name = 'speckleVisual_colors'
+  displayName = 'Colors'
+  analyticsPane = false
   slices: Array<FormattingSettingsSlice> = [
     this.startColorSlice,
     this.midColorSlice,

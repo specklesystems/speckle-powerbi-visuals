@@ -28,7 +28,7 @@ export class Tracker {
     events: Array<{ event: Event; properties: any }>
   ) {
     try {
-      var res = await fetch(TRACK_URL, {
+      await fetch(TRACK_URL, {
         method: "POST",
         body:
           "data=" +

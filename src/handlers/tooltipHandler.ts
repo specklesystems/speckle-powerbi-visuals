@@ -1,8 +1,6 @@
 import powerbi from 'powerbi-visuals-api'
 import ITooltipService = powerbi.extensibility.ITooltipService
-import { cleanupDataColumnName } from '../utils'
-import _ from 'lodash'
-import { IViewerTooltip, IViewerTooltipData, SpeckleTooltip } from '../types'
+import { IViewerTooltip, SpeckleTooltip } from '../types'
 
 export default class TooltipHandler {
   private data: Map<string, IViewerTooltip>
@@ -22,8 +20,8 @@ export default class TooltipHandler {
 
   public show(hit: { guid: string; object: any; point: any }, screenLoc) {
     console.log('TooltipHandler.Show', hit, screenLoc)
-    var id = hit.object.id as string
-    var objTooltipData: IViewerTooltip = this.data.get(id)
+    const id = hit.object.id as string;
+    const objTooltipData: IViewerTooltip = this.data.get(id);
     console.log('TooltipHandler.Show: data', objTooltipData)
     if (!objTooltipData) return
 
@@ -51,7 +49,7 @@ export default class TooltipHandler {
 
   public move() {
     if (!this.currentTooltip) return
-    var pos = this.PingScreenPosition(this.currentTooltip.worldPos)
+    const pos = this.PingScreenPosition(this.currentTooltip.worldPos);
     this.currentTooltip.tooltip.coordinates = [pos.x, pos.y]
     this.tooltipService.move(this.currentTooltip.tooltip)
   }

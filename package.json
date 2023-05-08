@@ -1,9 +1,9 @@
 {
-  "name": "visual",
-  "description": "default_template_value",
+  "name": "@specklesystems/powerbi-visual",
+  "description": "A 3D viewer for Speckle Object in PowerBI",
   "repository": {
-    "type": "default_template_value",
-    "url": "default_template_value"
+    "type": "github",
+    "url": "https://github.com/specklesystems/speckle-powerbi-visuals"
   },
   "license": "MIT",
   "scripts": {
@@ -13,33 +13,34 @@
     "lint": "eslint -c .eslintrc.js --ext .ts src/"
   },
   "dependencies": {
-    "@babel/runtime": "7.21.0",
-    "@babel/runtime-corejs2": "7.21.0",
-    "@speckle/viewer": "^2.13.0",
+    "@babel/runtime": "7.21.5",
+    "@babel/runtime-corejs2": "7.21.5",
+    "@speckle/viewer": "^2.13.3",
     "color-interpolate": "^1.0.5",
-    "core-js": "3.30.0",
+    "core-js": "3.30.2",
     "lodash": "^4.17.21",
-    "powerbi-visuals-api": "~5.3.0",
-    "powerbi-visuals-utils-colorutils": "^6.0.1",
+    "powerbi-visuals-api": "~5.4.0",
+    "powerbi-visuals-utils-colorutils": "6.0.1",
     "powerbi-visuals-utils-dataviewutils": "6.0.1",
     "powerbi-visuals-utils-formattingmodel": "^5.0.0",
-    "powerbi-visuals-utils-interactivityutils": "^6.0.2",
-    "powerbi-visuals-utils-tooltiputils": "^6.0.1",
+    "powerbi-visuals-utils-interactivityutils": "6.0.2",
+    "powerbi-visuals-utils-tooltiputils": "6.0.1",
     "regenerator-runtime": "^0.13.11"
   },
   "devDependencies": {
-    "@babel/core": "^7.21.4",
-    "@babel/eslint-parser": "^7.21.3",
+    "@babel/core": "^7.21.8",
+    "@babel/eslint-parser": "^7.21.8",
+    "@babel/preset-env": "^7.21.5",
     "@types/core-js": "^2.5.5",
-    "@types/lodash": "^4.14.192",
+    "@types/lodash": "^4.14.194",
     "@types/regenerator-runtime": "^0.13.1",
     "@types/three": "^0.150.1",
-    "@typescript-eslint/eslint-plugin": "^5.58.0",
-    "@typescript-eslint/parser": "^5.58.0",
-    "eslint": "^8.38.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.2",
+    "@typescript-eslint/parser": "^5.59.2",
+    "eslint": "^8.40.0",
     "eslint-config-prettier": "^8.8.0",
-    "prettier": "^2.8.7",
-    "ts-loader": "6.1.0",
-    "typescript": "3.6.3"
+    "prettier": "^2.8.8",
+    "ts-loader": "^9.4.2",
+    "typescript": "^5.0.4"
   }
 }

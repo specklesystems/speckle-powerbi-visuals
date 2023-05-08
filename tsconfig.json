@@ -10,7 +10,8 @@
     "declaration": true,
     "lib": ["es2020", "dom"],
     "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "types": []
   },
   "files": ["./src/visual.ts"],
   "include": ["./src/**/*.ts"]

@@ -41,6 +41,7 @@
     "eslint-config-prettier": "^8.8.0",
     "prettier": "^2.8.8",
     "ts-loader": "^9.4.2",
-    "typescript": "^5.0.4"
+    "typescript": "^5.0.4",
+    "user-agent-data-types": "^0.3.1"
   }
 }

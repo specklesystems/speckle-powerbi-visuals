@@ -1,5 +1,5 @@
 import { formattingSettings } from 'powerbi-visuals-utils-formattingmodel'
-import { SpeckleVisualSettings } from './settings'
+import { SpeckleVisualSettings } from './'
 
 import FormattingSettingsCard = formattingSettings.Card
 import FormattingSettingsModel = formattingSettings.Model

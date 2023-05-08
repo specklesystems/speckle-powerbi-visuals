@@ -1,37 +1,6 @@
-import powerbi from "powerbi-visuals-api"
-
+import powerbi from 'powerbi-visuals-api'
+import { IViewerTooltip, IViewerTooltipData, SpeckleDataInput } from '../types'
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
-import {IViewerTooltip, IViewerTooltipData, SpeckleDataInput} from "./types";
-import {FilteringState, SelectionEvent} from "@speckle/viewer";
-
-export function VisualUpdateTypeToString(type: powerbi.VisualUpdateType) {
-  switch (type) {
-    case powerbi.VisualUpdateType.Resize:
-      return 'Resize'
-    case powerbi.VisualUpdateType.ResizeEnd:
-      return 'ResizeEnd'
-    case powerbi.VisualUpdateType.Style:
-      return 'Style'
-    case powerbi.VisualUpdateType.ViewMode:
-      return 'ViewMode'
-    case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
-      return 'Resize+ResizeEnd'
-    case powerbi.VisualUpdateType.Data:
-      return 'Data'
-    case powerbi.VisualUpdateType.All:
-      return 'All'
-  }
-}
-
-export function projectToScreen(cam: any, loc: any) {
-  cam.updateProjectionMatrix()
-  const copy = loc.clone();
-  copy.project(cam)
-  return {
-    x: (copy.x * 0.5 + 0.5) * window.innerWidth - 10,
-    y: (copy.y * -0.5 + 0.5) * window.innerHeight
-  }
-}
 
 export function validateMatrixView(options: VisualUpdateOptions): {
   hasColorFilter: boolean
@@ -42,9 +11,9 @@ export function validateMatrixView(options: VisualUpdateOptions): {
   if (!matrixVew) throw new Error('Data does not contain a matrix data view')
 
   let hasStream = false,
-      hasParentObject = false,
-      hasObject = false,
-      hasColorFilter = false;
+    hasParentObject = false,
+    hasObject = false,
+    hasColorFilter = false
 
   matrixVew.rows.levels.forEach((level) => {
     level.sources.forEach((source) => {
@@ -69,11 +38,11 @@ export function processMatrixView(
   host: powerbi.extensibility.visual.IVisualHost,
   onSelectionPair: (objId: string, selectionId: powerbi.extensibility.ISelectionId) => void
 ): SpeckleDataInput {
-  const objectUrlsToLoad = []
-  const objectIds = []
-  const selectedIds = []
-  const colorByIds = []
-  const objectTooltipData = new Map<string, IViewerTooltip>()
+  const objectUrlsToLoad = [],
+    objectIds = [],
+    selectedIds = [],
+    colorByIds = [],
+    objectTooltipData = new Map<string, IViewerTooltip>()
 
   matrixView.rows.root.children.forEach((streamUrlChild) => {
     const url = streamUrlChild.value
@@ -102,25 +71,19 @@ export function processMatrixView(
           let shouldColor = true
           // Create value records for the tooltips
           if (objectIdChild.values) {
-            const objectData: IViewerTooltipData[] = [];
+            const objectData: IViewerTooltipData[] = []
             Object.keys(objectIdChild.values).forEach((key) => {
-              const value: powerbi.DataViewMatrixNodeValue = objectIdChild.values[key];
-              const k: unknown = key;
-              const colInfo = matrixView.valueSources[k as number];
-              const highLightActive = value.highlight !== undefined;
+              const value: powerbi.DataViewMatrixNodeValue = objectIdChild.values[key]
+              const k: unknown = key
+              const colInfo = matrixView.valueSources[k as number]
+              const highLightActive = value.highlight !== undefined
               if (highLightActive) shouldColor = false
-              const isHighlighted = value.highlight !== null;
+              const isHighlighted = value.highlight !== null
 
               if (highLightActive && isHighlighted) {
                 selectedIds.push(objId)
                 shouldColor = true
               }
-              console.log('🖌️ Object highlight active/highlighted', {
-                highLightActive,
-                isHighlighted,
-                shouldColor,
-                value
-              })
               const propData: IViewerTooltipData = {
                 displayName: colInfo.displayName,
                 value: value.value.toString()
@@ -129,7 +92,7 @@ export function processMatrixView(
             })
             objectTooltipData.set(objId, { selectionId: nodeSelection, data: objectData })
           }
-          console.log('🖌️ Pushing object to color group?', shouldColor, objId)
+          //console.log('🖌️ Pushing object to color group?', shouldColor, objId)
           if (shouldColor) colorGroup.objectIds.push(objId)
         })
         if (colorGroup.objectIds.length > 0) colorByIds.push(colorGroup)
@@ -146,25 +109,4 @@ export function processMatrixView(
     objectTooltipData,
     view: matrixView
   }
-}
-
-export function getFirstViewableHit(arg: SelectionEvent, state: FilteringState) {
-  let hit = null
-  if (state.isolatedObjects) {
-    // Find the first hit contained in the isolated objects
-    hit = arg?.hits.find((hit) => {
-      const hitId = hit.object.id as string
-      return state.isolatedObjects.includes(hitId)
-    })
-  }
-  return hit
-}
-
-export function createViewerContainerDiv(parent: HTMLElement) {
-  const container = parent.appendChild(document.createElement('div'));
-  container.style.backgroundColor = 'transparent'
-  container.style.height = '100%'
-  container.style.width = '100%'
-  container.style.position = 'fixed'
-  return container
 }

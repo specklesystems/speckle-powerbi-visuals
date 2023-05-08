@@ -1,5 +1,5 @@
-import { AsyncSignal } from '../signal'
-import { SpeckleSelectionData } from '../types'
+import { AsyncSignal } from '../utils/signal'
+import { SpeckleSelectionData } from '../interfaces'
 
 export default class SelectionHandler {
   private selectionIdMap: Map<string, powerbi.extensibility.ISelectionId>
@@ -24,8 +24,8 @@ export default class SelectionHandler {
 
   public showContextMenu(hit) {
     console.log('showing context menu for hit')
-    const loc = this.PingScreenPosition(hit.point);
-    const selectionId = this.selectionIdMap.get(hit.object.id);
+    const loc = this.PingScreenPosition(hit.point)
+    const selectionId = this.selectionIdMap.get(hit.object.id)
     this.selectionManager.showContextMenu(selectionId, loc)
   }
 

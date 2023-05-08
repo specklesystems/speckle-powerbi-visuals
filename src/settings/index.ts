@@ -4,7 +4,7 @@ import { dataViewObjectsParser } from 'powerbi-visuals-utils-dataviewutils'
 import DataViewObjectsParser = dataViewObjectsParser.DataViewObjectsParser
 import _ from 'lodash'
 import { SpeckleVisualSettingsModel } from './visualSettingsModel'
-import { CanonicalView } from "@speckle/viewer/dist/IViewer";
+import { CanonicalView } from '@speckle/viewer/dist/IViewer'
 
 export class CameraSettings {
   // Default color

@@ -1,24 +1,26 @@
 import 'core-js/stable'
-import 'regenerator-runtime/runtime' /* <---- add this line */
+import 'regenerator-runtime/runtime'
 import './../style/visual.less'
 
 import powerbi from 'powerbi-visuals-api'
 import * as _ from 'lodash'
-import { Tracker } from './mixpanel'
 import { FormattingSettingsService } from 'powerbi-visuals-utils-formattingmodel'
+
+import { Tracker } from './utils/mixpanel'
 import { SpeckleDataInput } from './types'
-import { processMatrixView, validateMatrixView } from './utils'
+import { processMatrixView, validateMatrixView } from './utils/matrixViewUtils'
 import { SpeckleVisualSettings } from './settings'
+import { SpeckleVisualSettingsModel } from './settings/visualSettingsModel'
+
 import ViewerHandler from './handlers/viewerHandler'
 import LandingPageHandler from './handlers/landingPageHandler'
 import TooltipHandler from './handlers/tooltipHandler'
 import SelectionHandler from './handlers/selectionHandler'
-import { SpeckleVisualSettingsModel } from './visualSettingsModel'
 
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
-import ITooltipService = powerbi.extensibility.ITooltipService
 import IVisual = powerbi.extensibility.visual.IVisual
+import ITooltipService = powerbi.extensibility.ITooltipService
 
 // noinspection JSUnusedGlobalSymbols
 export class Visual implements IVisual {
@@ -82,10 +84,10 @@ export class Visual implements IVisual {
     await this.updateTask
     await this.viewerHandler.clear()
     this.selectionHandler.clear()
+    this.ac = new AbortController()
   }
 
   public update(options: VisualUpdateOptions) {
-    console.log('Data update')
     this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
       SpeckleVisualSettingsModel,
       options.dataViews
@@ -130,6 +132,10 @@ export class Visual implements IVisual {
 
   private async handleDataUpdate(input: SpeckleDataInput, signal: AbortSignal) {
     await this.viewerHandler.loadObjects(input.objectsToLoad, this.onLoad, this.onError, signal)
+    if (signal.aborted) {
+      console.warn('Aborted')
+      return
+    }
     await this.viewerHandler.colorObjectsByGroup(input.colorByIds)
 
     if (input.selectedIds.length == 0)
@@ -151,9 +157,10 @@ export class Visual implements IVisual {
       }
       console.log('Updating viewer with new data')
       // Handle the update in data passed to this visual
-      this.updateTask = this.handleDataUpdate(input, this.ac.signal).then(
-        () => (this.updateTask = undefined)
-      )
+      this.updateTask = this.handleDataUpdate(input, this.ac.signal).then(() => {
+        this.ac = new AbortController()
+        this.updateTask = undefined
+      })
     })
   }, 500)
 
@@ -185,7 +192,8 @@ export class Visual implements IVisual {
     )
   }
 
-  public destroy(): void {
+  public async destroy() {
+    await this.clear()
     this.viewerHandler.dispose()
   }
 }

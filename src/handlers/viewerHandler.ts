@@ -7,9 +7,14 @@ import {
   IntersectionQuery,
   IntersectionQueryResult
 } from '@speckle/viewer'
-import { createViewerContainerDiv, getFirstViewableHit, projectToScreen } from '../utils'
+import {
+  createViewerContainerDiv,
+  getFirstViewableHit,
+  projectToScreen
+} from '../utils/viewerUtils'
 import { SpeckleVisualSettings } from '../settings'
-import { SettingsChangedType, Tracker } from '../mixpanel'
+import { SettingsChangedType, Tracker } from '../utils/mixpanel'
+import { isMultiSelect } from '../utils/isMultiSelect'
 
 export default class ViewerHandler {
   private viewer: Viewer
@@ -38,13 +43,14 @@ export default class ViewerHandler {
   private async objectClicked(arg: SelectionEvent) {
     console.log('viewer clicked event', arg)
     const button = arg?.event?.button ?? 0
-    const multi = arg?.event?.ctrlKey ?? false
+    const multi = isMultiSelect(arg?.event)
     const hit = getFirstViewableHit(arg, this.state)
 
     if (button == 2) {
       if (this.OnObjectRightClicked) this.OnObjectRightClicked(hit, multi)
     } else if (button == 0) {
       if (this.OnObjectClicked) this.OnObjectClicked(hit, multi)
+
       if (hit && multi) {
         this.currentSelection.add(hit.object.id as string)
       } else if (hit && !multi) {
@@ -197,7 +203,6 @@ export default class ViewerHandler {
     }[]
   ) {
     console.log('🖌️ Coloring objects', groups)
-
     if (!groups) this.state = await this.viewer.removeColorFilter()
     //@ts-ignore
     else this.state = await this.viewer.setUserObjectColors(groups)

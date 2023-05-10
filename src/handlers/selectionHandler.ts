@@ -22,11 +22,11 @@ export default class SelectionHandler {
     })
   }
 
-  public showContextMenu(hit) {
+  public async showContextMenu(hit) {
     console.log('showing context menu for hit')
     const loc = this.PingScreenPosition(hit.point)
     const selectionId = this.selectionIdMap.get(hit.object.id)
-    this.selectionManager.showContextMenu(selectionId, loc)
+    return this.selectionManager.showContextMenu(selectionId, loc)
   }
 
   public set(url: string, data: powerbi.extensibility.ISelectionId) {

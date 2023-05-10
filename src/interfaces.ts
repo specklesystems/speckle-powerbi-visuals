@@ -15,6 +15,6 @@ export interface SpeckleTooltip {
     x: number
     y: number
   }
-  tooltip: any
+  tooltip
   id: string
 }

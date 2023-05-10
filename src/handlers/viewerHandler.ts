@@ -46,6 +46,8 @@ export default class ViewerHandler {
     const multi = isMultiSelect(arg?.event)
     const hit = getFirstViewableHit(arg, this.state)
 
+    await this.viewer.resetHighlight()
+
     if (button == 2) {
       if (this.OnObjectRightClicked) this.OnObjectRightClicked(hit, multi)
     } else if (button == 0) {
@@ -178,7 +180,7 @@ export default class ViewerHandler {
 
   public async highlightObjects(objectIds: string[]) {
     if (objectIds) {
-      await this.viewer.highlightObjects(objectIds, true)
+      await this.viewer.highlightObjects(objectIds)
       console.log('highlighted objects', objectIds)
     } else {
       await this.viewer.resetHighlight()
@@ -203,9 +205,10 @@ export default class ViewerHandler {
     }[]
   ) {
     console.log('🖌️ Coloring objects', groups)
-    if (!groups) this.state = await this.viewer.removeColorFilter()
+    await this.viewer.removeColorFilter()
+    if (groups)
     //@ts-ignore
-    else this.state = await this.viewer.setUserObjectColors(groups)
+      this.state = await this.viewer.setUserObjectColors(groups)
   }
 
   public async resetFilters(zoomExtents = false) {

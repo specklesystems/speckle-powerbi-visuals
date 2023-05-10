@@ -137,7 +137,7 @@ export class Visual implements IVisual {
       return
     }
     await this.viewerHandler.colorObjectsByGroup(input.colorByIds)
-
+    await this.viewerHandler.unIsolateObjects(input.objectIds)
     if (input.selectedIds.length == 0)
       await this.viewerHandler.isolateObjects(input.objectIds, true)
     else await this.viewerHandler.isolateObjects(input.selectedIds, true)

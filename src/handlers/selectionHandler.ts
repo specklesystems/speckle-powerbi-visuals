@@ -15,6 +15,7 @@ export default class SelectionHandler {
 
   public async showContextMenu(ev: MouseEvent, hit?) {
     const selectionId = !hit ? null : this.selectionIdMap.get(hit?.object?.id)
+
     return this.selectionManager.showContextMenu(selectionId, {
       x: ev.clientX,
       y: ev.clientY
@@ -34,8 +35,6 @@ export default class SelectionHandler {
       this.currentSelection.clear()
       this.currentSelection.add(url)
     }
-
-    console.log('Post-select', this.getCurrentSelection())
   }
 
   public getCurrentSelection(): { id: string; selectionId: powerbi.extensibility.ISelectionId }[] {

@@ -4,7 +4,6 @@ export function getOS(): OS {
   const platform = window.navigator?.userAgentData?.platform || window.navigator.platform,
     macosPlatforms = ['Macintosh', 'MacIntel', 'MacPPC', 'Mac68K', 'macOS'],
     windowsPlatforms = ['Win32', 'Win64', 'Windows', 'WinCE']
-  console.log('🖥️ Getting os', platform, window)
   let os = null
   if (macosPlatforms.indexOf(platform) !== -1) {
     os = 'MacOS'
@@ -13,7 +12,6 @@ export function getOS(): OS {
   } else if (/Linux/.test(platform)) {
     os = 'Linux'
   }
-  console.log('Running in OS', os)
   return os
 }
 

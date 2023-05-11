@@ -136,18 +136,10 @@ export default class ViewerHandler {
     }
   }
 
-  public async highlightObjects(objectIds: string[]) {
-    if (objectIds) {
-      await this.viewer.highlightObjects(objectIds)
-      console.log('highlighted objects', objectIds)
-    } else {
-      console.log('reset highlight')
-    }
-  }
-
-  public async unIsolateObjects(objectIds: string[]) {
-    console.log('UnIsolating objects', 'powerbi', objectIds.length)
-    this.state = await this.viewer.unIsolateObjects(objectIds, 'powerbi', true)
+  public async unIsolateObjects() {
+    console.log('UnIsolating objects', this.state)
+    if (this.state.isolatedObjects)
+      this.state = await this.viewer.unIsolateObjects(this.state.isolatedObjects, 'powerbi', true)
   }
 
   public async isolateObjects(objectIds, ghost = false) {
@@ -166,11 +158,6 @@ export default class ViewerHandler {
     if (groups)
       //@ts-ignore
       this.state = await this.viewer.setUserObjectColors(groups)
-  }
-
-  public async resetFilters(zoomExtents = false) {
-    this.state = await this.viewer.resetFilters()
-    if (zoomExtents) this.viewer.zoom()
   }
 
   public async clear() {

@@ -35,45 +35,22 @@ export class Visual implements IVisual {
   private formattingSettingsService: FormattingSettingsService
   private updateTask: Promise<void>
   private ac = new AbortController()
+  private moved = false
 
   // noinspection JSUnusedGlobalSymbols
   public constructor(options: VisualConstructorOptions) {
-    console.log(' - Visual started')
+    console.log(' - Visual started', options)
     Tracker.loaded()
     this.host = options.host
     this.target = options.element
     this.formattingSettingsService = new FormattingSettingsService()
 
     console.log(' - Init handlers')
+    this.target.addEventListener('pointerdown', this.onPointerDown)
+    this.target.addEventListener('pointerup', this.onPointerUp)
 
-    this.target.addEventListener('click', async (ev) => {
-      const intersectResult = await this.viewerHandler.intersect({ x: ev.clientX, y: ev.clientY })
-      const multi = isMultiSelect(ev)
-      const hit = intersectResult?.hit
-      if (hit) {
-        console.log('🐁 GOT HIT', hit)
-        const id = hit.object.id as string
-
-        if (multi || !this.selectionHandler.isSelected(id))
-          await this.selectionHandler.select(id, multi)
-
-        this.tooltipHandler.show(hit, { x: ev.clientX, y: ev.clientY })
-        const selection = this.selectionHandler.getCurrentSelection()
-        const ids = selection.map((s) => s.id)
-        await this.viewerHandler.selectObjects(ids)
-      } else {
-        this.tooltipHandler.hide()
-        if (!multi) {
-          this.selectionHandler.clear()
-          await this.viewerHandler.selectObjects(null)
-        }
-      }
-    })
-    this.target.addEventListener('auxclick', async (ev) => {
-      const intersectResult = await this.viewerHandler.intersect({ x: ev.clientX, y: ev.clientY })
-      const hit = intersectResult?.hit
-      await this.selectionHandler.showContextMenu(ev, hit)
-    })
+    this.target.addEventListener('click', this.onClick)
+    this.target.addEventListener('auxclick', this.onAuxClick)
 
     this.selectionHandler = new SelectionHandler(this.host)
     this.landingPageHandler = new LandingPageHandler(this.target)
@@ -124,7 +101,7 @@ export class Visual implements IVisual {
       console.log('INPUT: ✅ Valid')
       this.landingPageHandler.hide()
     } catch (e) {
-      console.log('INPUT: ❌ Not valid', e)
+      console.log('INPUT: ❌ Not valid', (e as Error).message)
       this.host.displayWarningIcon(
         `Incomplete data input.`,
         `"Stream URL" and "Object ID" data inputs are mandatory`
@@ -163,7 +140,7 @@ export class Visual implements IVisual {
       return
     }
     await this.viewerHandler.colorObjectsByGroup(input.colorByIds)
-    await this.viewerHandler.unIsolateObjects(input.objectIds)
+    await this.viewerHandler.unIsolateObjects()
     if (input.selectedIds.length == 0)
       await this.viewerHandler.isolateObjects(input.objectIds, true)
     else await this.viewerHandler.isolateObjects(input.selectedIds, true)
@@ -205,8 +182,53 @@ export class Visual implements IVisual {
     )
   }
 
+  private onPointerMove = (_) => {
+    this.moved = true
+  }
+  private onPointerDown = (_) => {
+    this.moved = false
+    this.target.addEventListener('pointermove', this.onPointerMove)
+  }
+  private onPointerUp = (_) => {
+    this.target.removeEventListener('pointermove', this.onPointerMove)
+  }
+
+  private onClick = async (ev) => {
+    if (this.moved) return
+    const intersectResult = await this.viewerHandler.intersect({ x: ev.clientX, y: ev.clientY })
+    const multi = isMultiSelect(ev)
+    const hit = intersectResult?.hit
+    if (hit) {
+      console.log('🐁 GOT HIT', hit)
+      const id = hit.object.id as string
+
+      if (multi || !this.selectionHandler.isSelected(id))
+        await this.selectionHandler.select(id, multi)
+
+      this.tooltipHandler.show(hit, { x: ev.clientX, y: ev.clientY })
+      const selection = this.selectionHandler.getCurrentSelection()
+      const ids = selection.map((s) => s.id)
+      await this.viewerHandler.selectObjects(ids)
+    } else {
+      this.tooltipHandler.hide()
+      if (!multi) {
+        this.selectionHandler.clear()
+        await this.viewerHandler.selectObjects(null)
+      }
+    }
+  }
+  private onAuxClick = async (ev) => {
+    if (ev.button != 2 || this.moved) return
+    const intersectResult = await this.viewerHandler.intersect({ x: ev.clientX, y: ev.clientY })
+    await this.selectionHandler.showContextMenu(ev, intersectResult?.hit)
+  }
+
   public async destroy() {
     await this.clear()
     this.viewerHandler.dispose()
+    this.target.removeEventListener('pointerup', this.onPointerUp)
+    this.target.removeEventListener('pointerdown', this.onPointerDown)
+    this.target.removeEventListener('click', this.onClick)
+    this.target.removeEventListener('auxclick', this.onAuxClick)
   }
 }

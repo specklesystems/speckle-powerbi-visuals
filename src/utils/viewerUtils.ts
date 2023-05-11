@@ -1,4 +1,4 @@
-import { FilteringState, SelectionEvent } from '@speckle/viewer'
+import { FilteringState } from '@speckle/viewer'
 
 export function projectToScreen(cam, loc) {
   cam.updateProjectionMatrix()
@@ -20,17 +20,6 @@ export function pickViewableHit(hits: Hit[], state: FilteringState): Hit | null 
   if (state.isolatedObjects) {
     // Find the first hit contained in the isolated objects
     hit = hits.find((hit) => {
-      const hitId = hit.object.id as string
-      return state.isolatedObjects.includes(hitId)
-    })
-  }
-  return hit
-}
-export function getFirstViewableHit(arg: SelectionEvent, state: FilteringState) {
-  let hit = null
-  if (state.isolatedObjects) {
-    // Find the first hit contained in the isolated objects
-    hit = arg?.hits.find((hit) => {
       const hitId = hit.object.id as string
       return state.isolatedObjects.includes(hitId)
     })

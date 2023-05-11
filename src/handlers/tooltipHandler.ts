@@ -19,7 +19,7 @@ export default class TooltipHandler {
     this.data = data
   }
 
-  public show(hit: { guid: string; object; point }, screenLoc) {
+  public show(hit: { guid: string; object?; point }, screenLoc) {
     const id = hit.object.id as string
     const objTooltipData: IViewerTooltip = this.data.get(id)
     if (!objTooltipData) return

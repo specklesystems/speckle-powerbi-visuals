@@ -2,7 +2,6 @@ import 'core-js/stable'
 import 'regenerator-runtime/runtime'
 import './../style/visual.less'
 
-import powerbi from 'powerbi-visuals-api'
 import * as _ from 'lodash'
 import { FormattingSettingsService } from 'powerbi-visuals-utils-formattingmodel'
 
@@ -21,6 +20,7 @@ import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructor
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
 import IVisual = powerbi.extensibility.visual.IVisual
 import ITooltipService = powerbi.extensibility.ITooltipService
+import { isMultiSelect } from './utils/isMultiSelect'
 
 // noinspection JSUnusedGlobalSymbols
 export class Visual implements IVisual {
@@ -46,6 +46,35 @@ export class Visual implements IVisual {
 
     console.log(' - Init handlers')
 
+    this.target.addEventListener('click', async (ev) => {
+      const intersectResult = await this.viewerHandler.intersect({ x: ev.clientX, y: ev.clientY })
+      const multi = isMultiSelect(ev)
+      const hit = intersectResult?.hit
+      if (hit) {
+        console.log('🐁 GOT HIT', hit)
+        const id = hit.object.id as string
+
+        if (multi || !this.selectionHandler.isSelected(id))
+          await this.selectionHandler.select(id, multi)
+
+        this.tooltipHandler.show(hit, { x: ev.clientX, y: ev.clientY })
+        const selection = this.selectionHandler.getCurrentSelection()
+        const ids = selection.map((s) => s.id)
+        await this.viewerHandler.selectObjects(ids)
+      } else {
+        this.tooltipHandler.hide()
+        if (!multi) {
+          this.selectionHandler.clear()
+          await this.viewerHandler.selectObjects(null)
+        }
+      }
+    })
+    this.target.addEventListener('auxclick', async (ev) => {
+      const intersectResult = await this.viewerHandler.intersect({ x: ev.clientX, y: ev.clientY })
+      const hit = intersectResult?.hit
+      await this.selectionHandler.showContextMenu(ev, hit)
+    })
+
     this.selectionHandler = new SelectionHandler(this.host)
     this.landingPageHandler = new LandingPageHandler(this.target)
     this.viewerHandler = new ViewerHandler(this.target)
@@ -53,14 +82,9 @@ export class Visual implements IVisual {
 
     console.log('Setup handler events')
 
-    this.viewerHandler.OnCameraUpdate = _.throttle(() => {
+    this.viewerHandler.OnCameraUpdate = _.throttle((args) => {
       this.tooltipHandler.move()
     }, 1000.0 / 60.0).bind(this)
-
-    this.viewerHandler.OnObjectClicked = this.onObjectClicked.bind(this)
-    this.viewerHandler.OnObjectRightClicked = (hit) => {
-      this.selectionHandler.showContextMenu(hit)
-    }
 
     this.tooltipHandler.PingScreenPosition = this.viewerHandler.getScreenPosition.bind(
       this.viewerHandler
@@ -107,6 +131,7 @@ export class Visual implements IVisual {
       )
       console.warn(`Incomplete data input. "Stream URL" and "Object ID" data inputs are mandatory`)
       this.clear()
+      this.landingPageHandler.show()
       return
     }
 
@@ -131,6 +156,7 @@ export class Visual implements IVisual {
   }
 
   private async handleDataUpdate(input: SpeckleDataInput, signal: AbortSignal) {
+    await this.viewerHandler.selectObjects(null)
     await this.viewerHandler.loadObjects(input.objectsToLoad, this.onLoad, this.onError, signal)
     if (signal.aborted) {
       console.warn('Aborted')
@@ -163,19 +189,6 @@ export class Visual implements IVisual {
       })
     })
   }, 500)
-
-  private onObjectClicked(hit, multi) {
-    console.log('Object was clicked', hit?.object)
-    if (hit) {
-      const screenLoc = this.viewerHandler.getScreenPosition(hit.point)
-      console.log('showing tooltip', screenLoc)
-      this.selectionHandler.select(hit.object.id, multi)
-      this.tooltipHandler.show(hit, screenLoc)
-    } else {
-      this.selectionHandler.clear()
-      this.tooltipHandler.hide()
-    }
-  }
 
   private onLoad(url: string, index: number) {
     console.log(`Loaded object ${url} with index ${index}`)

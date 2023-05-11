@@ -1,48 +1,61 @@
-import { AsyncSignal } from '../utils/signal'
-import { SpeckleSelectionData } from '../interfaces'
-
 export default class SelectionHandler {
   private selectionIdMap: Map<string, powerbi.extensibility.ISelectionId>
+  private currentSelection: Set<string>
   private selectionManager: powerbi.extensibility.ISelectionManager
   private host: powerbi.extensibility.visual.IVisualHost
 
   public PingScreenPosition: (worldPosition) => { x: number; y: number }
-  private onSelection = new AsyncSignal<SelectionHandler, powerbi.extensibility.ISelectionId[]>()
-
-  public get OnSelectionEvent() {
-    return this.onSelection.expose()
-  }
 
   public constructor(host: powerbi.extensibility.visual.IVisualHost) {
     this.host = host
     this.selectionManager = this.host.createSelectionManager()
     this.selectionIdMap = new Map<string, powerbi.extensibility.ISelectionId>()
-    this.selectionManager.registerOnSelectCallback(async (ids) => {
-      await this.onSelection.triggerAwait(this, ids)
-    })
+    this.currentSelection = new Set<string>()
   }
 
-  public async showContextMenu(hit) {
-    console.log('showing context menu for hit')
-    const loc = this.PingScreenPosition(hit.point)
-    const selectionId = this.selectionIdMap.get(hit.object.id)
-    return this.selectionManager.showContextMenu(selectionId, loc)
+  public async showContextMenu(ev: MouseEvent, hit?) {
+    const selectionId = !hit ? null : this.selectionIdMap.get(hit?.object?.id)
+    return this.selectionManager.showContextMenu(selectionId, {
+      x: ev.clientX,
+      y: ev.clientY
+    })
   }
 
   public set(url: string, data: powerbi.extensibility.ISelectionId) {
     this.selectionIdMap.set(url, data)
   }
-  public select(url: string, multi = false) {
-    this.selectionManager.select(this.selectionIdMap.get(url), multi)
+  public async select(url: string, multi = false) {
+    if (multi) {
+      await this.selectionManager.select(this.selectionIdMap.get(url), true)
+      if (this.currentSelection.has(url)) this.currentSelection.delete(url)
+      else this.currentSelection.add(url)
+    } else {
+      await this.selectionManager.select(this.selectionIdMap.get(url), false)
+      this.currentSelection.clear()
+      this.currentSelection.add(url)
+    }
+
+    console.log('Post-select', this.getCurrentSelection())
   }
 
+  public getCurrentSelection(): { id: string; selectionId: powerbi.extensibility.ISelectionId }[] {
+    return [...this.currentSelection].map((entry) => ({
+      id: entry,
+      selectionId: this.selectionIdMap.get(entry)
+    }))
+  }
+
+  public isSelected(id: string) {
+    return this.currentSelection.has(id)
+  }
   public clear() {
     this.selectionManager.clear()
+    this.currentSelection.clear()
   }
 
   public reset() {
     this.clear()
-    this.selectionIdMap = new Map<string, SpeckleSelectionData>()
+    this.selectionIdMap.clear()
   }
 
   public has(url) {

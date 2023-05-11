@@ -1,25 +1,11 @@
-import {
-  CanonicalView,
-  FilteringState,
-  Viewer,
-  ViewerEvent,
-  SelectionEvent,
-  IntersectionQuery,
-  IntersectionQueryResult
-} from '@speckle/viewer'
-import {
-  createViewerContainerDiv,
-  getFirstViewableHit,
-  projectToScreen
-} from '../utils/viewerUtils'
+import { CanonicalView, FilteringState, Viewer, IntersectionQuery } from '@speckle/viewer'
+import { createViewerContainerDiv, pickViewableHit, projectToScreen } from '../utils/viewerUtils'
 import { SpeckleVisualSettings } from '../settings'
 import { SettingsChangedType, Tracker } from '../utils/mixpanel'
-import { isMultiSelect } from '../utils/isMultiSelect'
 
 export default class ViewerHandler {
   private viewer: Viewer
   private readonly parent: HTMLElement
-  private currentSelection: Set<string> = new Set<string>()
   private state: FilteringState
   private loadedObjectsCache: Set<string> = new Set<string>()
   private settings = {
@@ -27,49 +13,14 @@ export default class ViewerHandler {
     batchSize: 25
   }
 
-  public OnObjectClicked: (hit: any, multi: boolean) => void
-  public OnObjectRightClicked: (hit: any, multi: boolean) => void
-  public OnObjectDoubleClicked: (hit: any) => void
   public OnCameraUpdate: () => void
 
   public constructor(parent: HTMLElement) {
     this.parent = parent
   }
 
-  private onCameraUpdate() {
+  private onCameraUpdate(args) {
     if (this.OnCameraUpdate) this.OnCameraUpdate()
-  }
-
-  private async objectClicked(arg: SelectionEvent) {
-    console.log('viewer clicked event', arg)
-    const button = arg?.event?.button ?? 0
-    const multi = isMultiSelect(arg?.event)
-    const hit = getFirstViewableHit(arg, this.state)
-
-    await this.viewer.resetHighlight()
-
-    if (button == 2) {
-      if (this.OnObjectRightClicked) this.OnObjectRightClicked(hit, multi)
-    } else if (button == 0) {
-      if (this.OnObjectClicked) this.OnObjectClicked(hit, multi)
-
-      if (hit && multi) {
-        this.currentSelection.add(hit.object.id as string)
-      } else if (hit && !multi) {
-        this.currentSelection.clear()
-        this.currentSelection.add(hit.object.id as string)
-      } else if (!multi) {
-        this.currentSelection.clear()
-      }
-
-      await this.selectObjects([...this.currentSelection.keys()])
-    }
-  }
-
-  private objectDoubleClicked(arg: SelectionEvent) {
-    console.log('Double clicked', arg)
-    const hit = getFirstViewableHit(arg, this.state)
-    if (this.OnObjectDoubleClicked) this.OnObjectDoubleClicked(hit)
   }
 
   public changeSettings(oldSettings: SpeckleVisualSettings, newSettings: SpeckleVisualSettings) {
@@ -96,11 +47,10 @@ export default class ViewerHandler {
       environmentSrc: null,
       showStats: true
     })
+
     await viewer.init()
 
     // Setup any events here (progress, load-complete...)
-    viewer.on(ViewerEvent.ObjectDoubleClicked, this.objectDoubleClicked.bind(this))
-    viewer.on(ViewerEvent.ObjectClicked, this.objectClicked.bind(this))
     viewer.cameraHandler.controls.addEventListener('update', this.onCameraUpdate.bind(this))
 
     this.viewer = viewer
@@ -166,16 +116,24 @@ export default class ViewerHandler {
   }
 
   public async intersect(coords: { x: number; y: number }) {
+    const point = this.viewer.Utils.screenToNDC(
+      coords.x,
+      coords.y,
+      this.parent.clientWidth,
+      this.parent.clientHeight
+    )
     const intQuery: IntersectionQuery = {
       operation: 'Pick',
-      point: {
-        x: coords.x,
-        y: coords.y,
-        z: 0
-      }
+      point
     }
-    const res = (await this.viewer.queryAsync(intQuery)) as IntersectionQueryResult
-    return res.objects
+
+    const res = this.viewer.query(intQuery)
+    console.log('Intersection result', res)
+    if (!res) return null
+    return {
+      hit: pickViewableHit(res.objects, this.state),
+      objects: res.objects
+    }
   }
 
   public async highlightObjects(objectIds: string[]) {
@@ -183,7 +141,6 @@ export default class ViewerHandler {
       await this.viewer.highlightObjects(objectIds)
       console.log('highlighted objects', objectIds)
     } else {
-      await this.viewer.resetHighlight()
       console.log('reset highlight')
     }
   }
@@ -207,7 +164,7 @@ export default class ViewerHandler {
     console.log('🖌️ Coloring objects', groups)
     await this.viewer.removeColorFilter()
     if (groups)
-    //@ts-ignore
+      //@ts-ignore
       this.state = await this.viewer.setUserObjectColors(groups)
   }
 
@@ -218,12 +175,12 @@ export default class ViewerHandler {
 
   public async clear() {
     if (this.viewer) await this.viewer.unloadAll()
+    this.loadedObjectsCache.clear()
   }
 
   public async selectObjects(objectIds: string[] = null) {
-    this.currentSelection.clear()
+    await this.viewer.resetHighlight()
     const objIds = objectIds ?? []
-    objectIds?.forEach((id) => this.currentSelection.add(id))
     this.state = await this.viewer.selectObjects(objIds)
   }
 

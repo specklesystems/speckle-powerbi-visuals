@@ -39,25 +39,25 @@ export class Visual implements IVisual {
 
   // noinspection JSUnusedGlobalSymbols
   public constructor(options: VisualConstructorOptions) {
-    console.log(' - Visual started', options)
     Tracker.loaded()
     this.host = options.host
     this.target = options.element
     this.formattingSettingsService = new FormattingSettingsService()
 
-    console.log(' - Init handlers')
-    this.target.addEventListener('pointerdown', this.onPointerDown)
-    this.target.addEventListener('pointerup', this.onPointerUp)
-
-    this.target.addEventListener('click', this.onClick)
-    this.target.addEventListener('auxclick', this.onAuxClick)
+    console.log('🚀 Init handlers')
 
     this.selectionHandler = new SelectionHandler(this.host)
     this.landingPageHandler = new LandingPageHandler(this.target)
     this.viewerHandler = new ViewerHandler(this.target)
     this.tooltipHandler = new TooltipHandler(this.host.tooltipService as ITooltipService)
 
-    console.log('Setup handler events')
+    console.log('🚀 Setup handler events')
+
+    this.target.addEventListener('pointerdown', this.onPointerDown)
+    this.target.addEventListener('pointerup', this.onPointerUp)
+
+    this.target.addEventListener('click', this.onClick)
+    this.target.addEventListener('auxclick', this.onAuxClick)
 
     this.viewerHandler.OnCameraUpdate = _.throttle((args) => {
       this.tooltipHandler.move()
@@ -76,8 +76,6 @@ export class Visual implements IVisual {
 
     //Show landing Page by default
     this.landingPageHandler.show()
-
-    console.log('Visual setup finished')
   }
 
   private async clear() {
@@ -95,13 +93,13 @@ export class Visual implements IVisual {
     )
     SpeckleVisualSettings.handleSettingsModelUpdate(this.formattingSettings)
 
-    let validationResult = null
     try {
-      validationResult = validateMatrixView(options)
-      console.log('INPUT: ✅ Valid')
+      console.log('🔍 Validating input...', options)
+      var validationResult = validateMatrixView(options)
+      console.log('✅Input valid', validationResult)
       this.landingPageHandler.hide()
     } catch (e) {
-      console.log('INPUT: ❌ Not valid', (e as Error).message)
+      console.log('❌Input not valid:', (e as Error).message)
       this.host.displayWarningIcon(
         `Incomplete data input.`,
         `"Stream URL" and "Object ID" data inputs are mandatory`
@@ -121,8 +119,11 @@ export class Visual implements IVisual {
         case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
           return
         default:
-          var input = processMatrixView(validationResult.view, this.host, (obj, id) =>
-            this.selectionHandler.set(obj, id)
+          var input = processMatrixView(
+            validationResult.view,
+            this.host,
+            validationResult.hasColorFilter,
+            (obj, id) => this.selectionHandler.set(obj, id)
           )
           this.tooltipHandler.setup(input.objectTooltipData)
           this.throttleUpdate(input)
@@ -133,6 +134,7 @@ export class Visual implements IVisual {
   }
 
   private async handleDataUpdate(input: SpeckleDataInput, signal: AbortSignal) {
+    console.log('DATA UPDATE', input)
     await this.viewerHandler.selectObjects(null)
     await this.viewerHandler.loadObjects(input.objectsToLoad, this.onLoad, this.onError, signal)
     if (signal.aborted) {
@@ -158,7 +160,6 @@ export class Visual implements IVisual {
         await this.updateTask
         this.ac = new AbortController()
       }
-      console.log('Updating viewer with new data')
       // Handle the update in data passed to this visual
       this.updateTask = this.handleDataUpdate(input, this.ac.signal).then(() => {
         this.ac = new AbortController()
@@ -199,7 +200,6 @@ export class Visual implements IVisual {
     const multi = isMultiSelect(ev)
     const hit = intersectResult?.hit
     if (hit) {
-      console.log('🐁 GOT HIT', hit)
       const id = hit.object.id as string
 
       if (multi || !this.selectionHandler.isSelected(id))

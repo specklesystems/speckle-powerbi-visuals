@@ -62,7 +62,7 @@ export default class ViewerHandler {
     signal?: AbortSignal,
     onObjectUnloaded?: (url: string) => void
   ) {
-    console.log('Unloading objects', this)
+    console.log('Unloading objects')
     for (const url of objects) {
       if (signal?.aborted) return
       await this.viewer
@@ -128,7 +128,6 @@ export default class ViewerHandler {
     }
 
     const res = this.viewer.query(intQuery)
-    console.log('Intersection result', res)
     if (!res) return null
     return {
       hit: pickViewableHit(res.objects, this.state),
@@ -137,13 +136,11 @@ export default class ViewerHandler {
   }
 
   public async unIsolateObjects() {
-    console.log('UnIsolating objects', this.state)
     if (this.state.isolatedObjects)
       this.state = await this.viewer.unIsolateObjects(this.state.isolatedObjects, 'powerbi', true)
   }
 
   public async isolateObjects(objectIds, ghost = false) {
-    console.log('Isolating objects', 'powerbi', objectIds.length, ghost)
     this.state = await this.viewer.isolateObjects(objectIds, 'powerbi', true, ghost)
   }
 
@@ -153,11 +150,8 @@ export default class ViewerHandler {
       color: string
     }[]
   ) {
-    console.log('🖌️ Coloring objects', groups)
-    await this.viewer.removeColorFilter()
-    if (groups)
-      //@ts-ignore
-      this.state = await this.viewer.setUserObjectColors(groups)
+    //@ts-ignore
+    this.state = await this.viewer.setUserObjectColors(groups ?? [])
   }
 
   public async clear() {
@@ -178,5 +172,6 @@ export default class ViewerHandler {
   public dispose() {
     this.viewer.cameraHandler.controls.removeAllEventListeners()
     this.viewer.dispose()
+    this.viewer = null
   }
 }

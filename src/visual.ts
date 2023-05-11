@@ -136,11 +136,17 @@ export class Visual implements IVisual {
   private async handleDataUpdate(input: SpeckleDataInput, signal: AbortSignal) {
     console.log('DATA UPDATE', input)
     await this.viewerHandler.selectObjects(null)
-    await this.viewerHandler.loadObjects(input.objectsToLoad, this.onLoad, this.onError, signal)
+    await this.viewerHandler.loadObjectsWithAutoUnload(
+      input.objectsToLoad,
+      this.onLoad,
+      this.onError,
+      signal
+    )
     if (signal.aborted) {
       console.warn('Aborted')
       return
     }
+
     await this.viewerHandler.colorObjectsByGroup(input.colorByIds)
     await this.viewerHandler.unIsolateObjects()
     if (input.selectedIds.length == 0)

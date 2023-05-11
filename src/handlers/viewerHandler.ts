@@ -2,6 +2,7 @@ import { CanonicalView, FilteringState, Viewer, IntersectionQuery } from '@speck
 import { createViewerContainerDiv, pickViewableHit, projectToScreen } from '../utils/viewerUtils'
 import { SpeckleVisualSettings } from '../settings'
 import { SettingsChangedType, Tracker } from '../utils/mixpanel'
+import _ from 'lodash'
 
 export default class ViewerHandler {
   private viewer: Viewer
@@ -75,6 +76,16 @@ export default class ViewerHandler {
     }
   }
 
+  public async loadObjectsWithAutoUnload(
+    objectUrls: string[],
+    onLoad: (url: string, index: number) => void,
+    onError: (url: string, error: Error) => void,
+    signal: AbortSignal
+  ) {
+    var objectsToUnload = _.difference([...this.loadedObjectsCache], objectUrls)
+    await this.unloadObjects(objectsToUnload, signal)
+    await this.loadObjects(objectUrls, onLoad, onError, signal)
+  }
   public async loadObjects(
     objectUrls: string[],
     onLoad: (url: string, index: number) => void,

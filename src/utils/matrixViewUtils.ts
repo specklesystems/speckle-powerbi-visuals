@@ -146,7 +146,6 @@ export function processMatrixView(
           })
           if (colorGroup.objectIds.length > 0) colorByIds.push(colorGroup)
         })
-        previousPaletteKey = queryName
       }
     })
   })

@@ -92,6 +92,8 @@ function processObjectIdLevel(
   )
 }
 
+var previousPalette = null
+var previousPaletteKey = null
 export function processMatrixView(
   matrixView: powerbi.DataViewMatrix,
   host: powerbi.extensibility.visual.IVisualHost,
@@ -103,7 +105,6 @@ export function processMatrixView(
     selectedIds = [],
     colorByIds = [],
     objectTooltipData = new Map<string, IViewerTooltip>()
-
   matrixView.rows.root.children.forEach((streamUrlChild) => {
     const url = streamUrlChild.value
 
@@ -123,7 +124,7 @@ export function processMatrixView(
           })
         })
       } else {
-        console.log('🖌️✅ HAS COLOR FILTER')
+        if (previousPalette) host.colorPalette['colorPalette'] = previousPalette
         parentObjectIdChild.children?.forEach((colorByChild) => {
           const color = host.colorPalette.getColor(colorByChild.value as string)
           const colorGroup = {
@@ -145,9 +146,12 @@ export function processMatrixView(
           })
           if (colorGroup.objectIds.length > 0) colorByIds.push(colorGroup)
         })
+        previousPaletteKey = queryName
       }
     })
   })
+
+  previousPalette = host.colorPalette['colorPalette']
 
   return {
     objectsToLoad: objectUrlsToLoad,

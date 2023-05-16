@@ -1,4 +1,10 @@
-import { CanonicalView, FilteringState, Viewer, IntersectionQuery } from '@speckle/viewer'
+import {
+  CanonicalView,
+  FilteringState,
+  Viewer,
+  IntersectionQuery,
+  DefaultViewerParams
+} from '@speckle/viewer'
 import { createViewerContainerDiv, pickViewableHit, projectToScreen } from '../utils/viewerUtils'
 import { SpeckleVisualSettings } from '../settings'
 import { SettingsChangedType, Tracker } from '../utils/mixpanel'
@@ -42,12 +48,9 @@ export default class ViewerHandler {
     if (this.viewer) return
     console.log('Initializing viewer')
     const container = createViewerContainerDiv(this.parent)
-    const viewer = new Viewer(container, {
-      verbose: false,
-      keepGeometryData: true,
-      environmentSrc: null,
-      showStats: true
-    })
+    const viewerSettings = DefaultViewerParams
+    viewerSettings.showStats = true
+    const viewer = new Viewer(container, viewerSettings)
 
     await viewer.init()
 

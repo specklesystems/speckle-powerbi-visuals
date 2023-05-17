@@ -49,7 +49,8 @@ export default class ViewerHandler {
     console.log('Initializing viewer')
     const container = createViewerContainerDiv(this.parent)
     const viewerSettings = DefaultViewerParams
-    viewerSettings.showStats = true
+    viewerSettings.showStats = false
+    viewerSettings.verbose = false
     const viewer = new Viewer(container, viewerSettings)
 
     await viewer.init()

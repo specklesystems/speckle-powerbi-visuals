@@ -1,17 +1,17 @@
-const TRACK_URL = "https://analytics.speckle.systems/track?ip=1"
-const MIXPANEL_TOKEN = "acd87c5a50b56df91a795e999812a3a4"
-const HOST_APP_NAME = "powerbi-visual"
+const TRACK_URL = 'https://analytics.speckle.systems/track?ip=1'
+const MIXPANEL_TOKEN = 'acd87c5a50b56df91a795e999812a3a4'
+const HOST_APP_NAME = 'powerbi-visual'
 
 export enum Event {
-  Create = "Create",
-  Reload = "Reload",
-  Settings = "Settings"
+  Create = 'Create',
+  Reload = 'Reload',
+  Settings = 'Settings'
 }
 
 export enum SettingsChangedType {
-  Gradient = "Gradient",
-  DefaultCamera = "DefaultCamera",
-  OrthoMode = "OrthoMode"
+  Gradient = 'Gradient',
+  DefaultCamera = 'DefaultCamera',
+  OrthoMode = 'OrthoMode'
 }
 
 export class Tracker {
@@ -24,16 +24,14 @@ export class Tracker {
     ])
   }
 
-  private static async trackEvents(
-    events: Array<{ event: Event; properties: any }>
-  ) {
+  private static async trackEvents(events: Array<{ event: Event; properties: any }>) {
     try {
-      var res = await fetch(TRACK_URL, {
-        method: "POST",
+      await fetch(TRACK_URL, {
+        method: 'POST',
         body:
-          "data=" +
+          'data=' +
           JSON.stringify(
-            events.map(e => {
+            events.map((e) => {
               Object.assign(e.properties, {
                 token: MIXPANEL_TOKEN,
                 hostApp: HOST_APP_NAME
@@ -42,9 +40,8 @@ export class Tracker {
             })
           )
       })
-      //console.log("Create track", res, await res.json())
     } catch (e) {
-      console.error("Create track failed", e)
+      console.error('Create track failed', e)
     }
   }
 

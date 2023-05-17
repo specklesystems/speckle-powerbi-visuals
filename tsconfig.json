@@ -3,13 +3,16 @@
     "allowJs": false,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "target": "es6",
+    "target": "es2020",
     "sourceMap": true,
     "outDir": "./.tmp/build/",
     "moduleResolution": "node",
     "declaration": true,
-    "lib": ["es2015", "dom"],
-    "allowSyntheticDefaultImports": true
+    "lib": ["es2020", "dom"],
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "types": []
   },
-  "files": ["./src/visual.ts"]
+  "files": ["./src/visual.ts"],
+  "include": ["./src/**/*.ts"]
 }

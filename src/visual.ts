@@ -1,468 +1,240 @@
-"use strict"
+import 'core-js/stable'
+import 'regenerator-runtime/runtime'
+import './../style/visual.less'
 
-import "core-js/stable"
-import "regenerator-runtime/runtime" /* <---- add this line */
-import "./../style/visual.less"
+import * as _ from 'lodash'
+import { FormattingSettingsService } from 'powerbi-visuals-utils-formattingmodel'
 
-import powerbi from "powerbi-visuals-api"
+import { Tracker } from './utils/mixpanel'
+import { SpeckleDataInput } from './types'
+import { processMatrixView, validateMatrixView } from './utils/matrixViewUtils'
+import { SpeckleVisualSettings } from './settings'
+import { SpeckleVisualSettingsModel } from './settings/visualSettingsModel'
+
+import ViewerHandler from './handlers/viewerHandler'
+import LandingPageHandler from './handlers/landingPageHandler'
+import TooltipHandler from './handlers/tooltipHandler'
+import SelectionHandler from './handlers/selectionHandler'
 
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
-import ITooltipService = powerbi.extensibility.ITooltipService
 import IVisual = powerbi.extensibility.visual.IVisual
-import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInstancesOptions
-import VisualObjectInstance = powerbi.VisualObjectInstance
-import DataView = powerbi.DataView
-import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject
+import ITooltipService = powerbi.extensibility.ITooltipService
+import { isMultiSelect } from './utils/isMultiSelect'
 
-import interpolate from "color-interpolate"
-
-import { SpeckleVisualSettings } from "./settings"
-import {
-  Viewer,
-  CanonicalView,
-  ViewerEvent,
-  PropertyInfo
-} from "@speckle/viewer"
-import _ from "lodash"
-import {
-  VisualUpdateTypeToString,
-  cleanupDataColumnName,
-  projectToScreen
-} from "./utils"
-import { SettingsChangedType, Tracker } from "./mixpanel"
-
-interface SpeckleTooltip {
-  worldPos: {
-    x: number
-    y: number
-    z: number
-  }
-  screenPos: {
-    x: number
-    y: number
-  }
-  tooltip: any
-  id: string
-}
-
+// noinspection JSUnusedGlobalSymbols
 export class Visual implements IVisual {
-  private target: HTMLElement
-  private settings: SpeckleVisualSettings
-  private host: powerbi.extensibility.IVisualHost
-  private selectionManager: powerbi.extensibility.ISelectionManager
-  private tooltipService: ITooltipService
+  private readonly target: HTMLElement
+  private readonly host: powerbi.extensibility.visual.IVisualHost
+  private readonly viewerHandler: ViewerHandler
 
-  private selectionIdMap: Map<string, powerbi.extensibility.ISelectionId>
-  private viewer: Viewer
-
+  private selectionHandler: SelectionHandler
+  private landingPageHandler: LandingPageHandler
+  private tooltipHandler: TooltipHandler
+  private formattingSettings: SpeckleVisualSettingsModel
+  private formattingSettingsService: FormattingSettingsService
   private updateTask: Promise<void>
   private ac = new AbortController()
-  private currentOrthoMode: boolean = false
-  private currentDefaultView: string = "default"
-  private currentTooltip: SpeckleTooltip = null
+  private moved = false
 
-  constructor(options: VisualConstructorOptions) {
+  // noinspection JSUnusedGlobalSymbols
+  public constructor(options: VisualConstructorOptions) {
     Tracker.loaded()
     this.host = options.host
-    this.selectionIdMap = new Map<string, powerbi.extensibility.ISelectionId>()
-    //@ts-ignore
-    this.selectionManager = this.host.createSelectionManager()
-    //@ts-ignore
-    this.tooltipService = this.host.tooltipService as ITooltipService
     this.target = options.element
-  }
+    this.formattingSettingsService = new FormattingSettingsService()
 
-  public async initViewer() {
-    if (this.viewer) return
+    console.log('🚀 Init handlers')
 
-    var container = this.createContainerDiv()
-    const viewer = new Viewer(container)
-    await viewer.init()
+    this.selectionHandler = new SelectionHandler(this.host)
+    this.landingPageHandler = new LandingPageHandler(this.target)
+    this.viewerHandler = new ViewerHandler(this.target)
+    this.tooltipHandler = new TooltipHandler(this.host.tooltipService as ITooltipService)
 
-    // Setup any events here (progress, load-complete...)
-    viewer.on(ViewerEvent.ObjectClicked, this.onObjectClicked)
-    viewer.on(ViewerEvent.ObjectDoubleClicked, this.onObjectDoubleClicked)
-    viewer.cameraHandler.controls.addEventListener(
-      "update",
-      this.throttleCameraUpdate
+    console.log('🚀 Setup handler events')
+
+    this.target.addEventListener('pointerdown', this.onPointerDown)
+    this.target.addEventListener('pointerup', this.onPointerUp)
+
+    this.target.addEventListener('click', this.onClick)
+    this.target.addEventListener('auxclick', this.onAuxClick)
+
+    this.viewerHandler.OnCameraUpdate = _.throttle((args) => {
+      this.tooltipHandler.move()
+    }, 1000.0 / 60.0).bind(this)
+
+    this.tooltipHandler.PingScreenPosition = this.viewerHandler.getScreenPosition.bind(
+      this.viewerHandler
+    )
+    this.selectionHandler.PingScreenPosition = this.viewerHandler.getScreenPosition.bind(
+      this.viewerHandler
     )
 
-    this.viewer = viewer
+    SpeckleVisualSettings.OnSettingsChanged = (oldSettings, newSettings) => {
+      this.viewerHandler.changeSettings(oldSettings, newSettings)
+    }
+
+    //Show landing Page by default
+    this.landingPageHandler.show()
+  }
+
+  private async clear() {
+    this.ac.abort()
+    await this.updateTask
+    await this.viewerHandler.clear()
+    this.selectionHandler.clear()
+    this.ac = new AbortController()
   }
 
   public update(options: VisualUpdateOptions) {
-    this.settings = Visual.parseSettings(
-      options && options.dataViews && options.dataViews[0]
+    this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
+      SpeckleVisualSettingsModel,
+      options.dataViews
     )
+    SpeckleVisualSettings.handleSettingsModelUpdate(this.formattingSettings)
 
-    this.HandleLandingPage(options)
-    if (this.isLandingPageOn) return
-    console.log(
-      `Update was called with update type ${VisualUpdateTypeToString(
-        options.type
-      )}`,
-      options,
-      this.settings
-    )
-
-    // TODO: These cases are not being handled right now, we will skip the update logic.
-    // Some are already handled by our viewer, such as resize, but others may require custom implementations in the future.
-    switch (options.type) {
-      case powerbi.VisualUpdateType.Resize:
-      case powerbi.VisualUpdateType.ResizeEnd:
-      case powerbi.VisualUpdateType.Style:
-      case powerbi.VisualUpdateType.ViewMode:
-      case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
-        // Ignore case, nothing will happen
-        return
-    }
-
-    console.log("Data was updated, updating viewer...")
-    this.debounceUpdate(options)
-  }
-
-  private async handleSettingsUpdate(options: VisualUpdateOptions) {
-    // Handle change in ortho mode
-    if (this.currentOrthoMode != this.settings.camera.orthoMode) {
-      if (this.settings.camera.orthoMode)
-        this.viewer?.cameraHandler?.setOrthoCameraOn()
-      else this.viewer?.cameraHandler?.setPerspectiveCameraOn()
-      this.currentOrthoMode = this.settings.camera.orthoMode
-      Tracker.settingsChanged(SettingsChangedType.OrthoMode)
-    }
-
-    // Handle change in default view
-    if (this.currentDefaultView != this.settings.camera.defaultView) {
-      this.viewer.setView(this.settings.camera.defaultView as CanonicalView)
-      this.currentDefaultView = this.settings.camera.defaultView
-      Tracker.settingsChanged(SettingsChangedType.DefaultCamera)
-    }
-
-    // Update bg of viewer
-    this.target.style.backgroundColor = this.settings.color.background
-  }
-
-  private async handleDataUpdate(
-    options: VisualUpdateOptions,
-    signal: AbortSignal
-  ) {
-    var categoricalView = options.dataViews[0].categorical
-    var streamCategory = categoricalView?.categories[0]?.values
-    var objectIdCategory = categoricalView?.categories[1]?.values
-    var highlightedValues = categoricalView?.values
-      ? categoricalView?.values[0].highlights
-      : null
-    if (!streamCategory || !objectIdCategory) {
-      // If some of the fields are not filled in, unload everything
-      //@ts-ignore
+    try {
+      console.log('🔍 Validating input...', options)
+      var validationResult = validateMatrixView(options)
+      console.log('✅Input valid', validationResult)
+      this.landingPageHandler.hide()
+    } catch (e) {
+      console.log('❌Input not valid:', (e as Error).message)
       this.host.displayWarningIcon(
         `Incomplete data input.`,
         `"Stream URL" and "Object ID" data inputs are mandatory`
       )
-      console.warn(
-        `Incomplete data input. "Stream URL" and "Object ID" data inputs are mandatory`
-      )
-      await this.viewer.unloadAll()
-      this.selectionIdMap = new Map<string, any>()
+      console.warn(`Incomplete data input. "Stream URL" and "Object ID" data inputs are mandatory`)
+      this.clear()
+      this.landingPageHandler.show()
       return
     }
 
-    var objectUrls = streamCategory.map(
-      (stream, index) => `${stream}/objects/${objectIdCategory[index]}`
-    )
-
-    var objectsToUnload = []
-    for (const key of this.selectionIdMap.keys()) {
-      const found = objectUrls.find(url => url == key)
-      if (!found) {
-        objectsToUnload.push(key)
+    try {
+      switch (options.type) {
+        case powerbi.VisualUpdateType.Resize:
+        case powerbi.VisualUpdateType.ResizeEnd:
+        case powerbi.VisualUpdateType.Style:
+        case powerbi.VisualUpdateType.ViewMode:
+        case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
+          return
+        default:
+          var input = processMatrixView(
+            validationResult.view,
+            this.host,
+            validationResult.hasColorFilter,
+            (obj, id) => this.selectionHandler.set(obj, id)
+          )
+          this.tooltipHandler.setup(input.objectTooltipData)
+          this.throttleUpdate(input)
       }
-    }
-
-    console.log(
-      `Viewer loading ${objectUrls.length} and unloading ${objectsToUnload.length}`
-    )
-
-    for (const url of objectsToUnload) {
-      if (signal?.aborted) return
-      await this.viewer
-        .cancelLoad(url, true)
-        .then(_ => {
-          this.selectionIdMap.delete(url)
-        })
-        .catch(e => console.warn("Viewer Unload error", url, e))
-    }
-
-    var index = 0
-    var promises = []
-    const batchSize = 25
-    for (const url of objectUrls) {
-      if (signal?.aborted) return
-      if (!this.selectionIdMap.has(url)) {
-        var promise = this.viewer
-          .loadObject(url, null, false)
-          .catch((e: Error) => {
-            //@ts-ignore
-            this.host.displayWarningIcon(
-              "Load error",
-              `One or more objects could not be loaded
-              Please ensure that the stream you're trying to access is PUBLIC
-              The Speckle PowerBI Viewer cannot handle private streams yet.`
-            )
-            console.warn("Viewer Load error:", url, e.name)
-          })
-        promises.push(promise)
-        if (promises.length == batchSize) {
-          await Promise.all(promises)
-          promises = []
-        }
-      }
-      // We create selection Ids for all objects, regardless if they're there already.
-      //@ts-ignore
-      var selectionBuilder = this.host.createSelectionIdBuilder()
-      var selectionId = selectionBuilder
-        .withCategory(categoricalView?.categories[1], index)
-        .createSelectionId()
-      this.selectionIdMap.set(url, selectionId)
-      index++
-    }
-    await Promise.all(promises)
-
-    if (signal?.aborted) return
-    Tracker.dataReload()
-
-    var colorList = this.settings.color.getColorList()
-    if (categoricalView?.values) {
-      var name = categoricalView?.values[0].source.displayName
-      var objectIds = highlightedValues
-        ? highlightedValues
-            .map((value, index) =>
-              value ? objectIdCategory[index].toString() : null
-            )
-            .filter(e => e != null)
-        : null
-      if (objectIds) {
-        await this.viewer.resetFilters()
-        await this.viewer.isolateObjects(objectIds, null, true, true)
-      } else {
-        await this.viewer.resetFilters()
-      }
-      var prop = this.viewer
-        .getObjectProperties(null, true)
-        .find(item => item.key == cleanupDataColumnName(name))
-
-      if (prop.type == "number") {
-        var groups = this.getCustomColorGroups(prop, colorList)
-        //@ts-ignore
-        await this.viewer.setUserObjectColors(groups)
-      } else {
-        await this.viewer.setColorFilter(prop).catch(async e => {
-          console.warn("Filter failed to be applied. Filter will be reset", e)
-          return await this.viewer.removeColorFilter()
-        })
-      }
-    } else {
-      await this.viewer.resetFilters()
-      this.viewer.zoom()
+    } catch (error) {
+      console.error('Data update error', error ?? 'Unknown')
     }
   }
 
-  private static parseSettings(dataView: DataView): SpeckleVisualSettings {
-    return <SpeckleVisualSettings>SpeckleVisualSettings.parse(dataView)
-  }
-
-  /**
-   * This function gets called for each of the objects defined in the capabilities files and allows you to select which of the
-   * objects and properties you want to expose to the users in the property pane.
-   *
-   */
-  public enumerateObjectInstances(
-    options: EnumerateVisualObjectInstancesOptions
-  ): VisualObjectInstance[] | VisualObjectInstanceEnumerationObject {
-    return SpeckleVisualSettings.enumerateObjectInstances(
-      this.settings || SpeckleVisualSettings.getDefault(),
-      options
+  private async handleDataUpdate(input: SpeckleDataInput, signal: AbortSignal) {
+    console.log('DATA UPDATE', input)
+    await this.viewerHandler.selectObjects(null)
+    await this.viewerHandler.loadObjectsWithAutoUnload(
+      input.objectsToLoad,
+      this.onLoad,
+      this.onError,
+      signal
     )
+    if (signal.aborted) {
+      console.warn('Aborted')
+      return
+    }
+
+    await this.viewerHandler.colorObjectsByGroup(input.colorByIds)
+    await this.viewerHandler.unIsolateObjects()
+    if (input.selectedIds.length == 0)
+      await this.viewerHandler.isolateObjects(input.objectIds, true)
+    else await this.viewerHandler.isolateObjects(input.selectedIds, true)
   }
 
-  private debounceUpdate = _.debounce(options => {
-    this.initViewer().then(async _ => {
+  public getFormattingModel(): powerbi.visuals.FormattingModel {
+    return this.formattingSettingsService.buildFormattingModel(this.formattingSettings)
+  }
+
+  private throttleUpdate = _.throttle((input: SpeckleDataInput) => {
+    this.viewerHandler.init().then(async () => {
       if (this.updateTask) {
         this.ac.abort()
-        console.log("Cancelling previous load job")
+        console.log('Cancelling previous load job')
         await this.updateTask
         this.ac = new AbortController()
       }
-      // Handle changes in the visual objects
-      this.handleSettingsUpdate(options)
-      console.log("Updating viewer with new data")
       // Handle the update in data passed to this visual
-      this.updateTask = this.handleDataUpdate(options, this.ac.signal).then(
-        () => (this.updateTask = undefined)
-      )
+      this.updateTask = this.handleDataUpdate(input, this.ac.signal).then(() => {
+        this.ac = new AbortController()
+        this.updateTask = undefined
+      })
     })
   }, 500)
 
-  private throttleCameraUpdate = _.throttle(options => {
-    if (!this.currentTooltip) return
-    var newScreenLoc = projectToScreen(
-      this.viewer.cameraHandler.camera,
-      this.currentTooltip.worldPos
+  private onLoad(url: string, index: number) {
+    console.log(`Loaded object ${url} with index ${index}`)
+  }
+
+  private onError(url: string, error: Error) {
+    console.warn(`Error loading object ${url} with error`, error)
+    this.host.displayWarningIcon(
+      'Load error',
+      `One or more objects could not be loaded 
+      Please ensure that the stream you're trying to access is PUBLIC
+      The Speckle PowerBI Viewer cannot handle private streams yet.
+      `
     )
-    this.currentTooltip.tooltip.coordinates = [newScreenLoc.x, newScreenLoc.y]
-    this.tooltipService.move(this.currentTooltip.tooltip)
-  }, 1000.0 / 60.0)
-
-  private onObjectClicked = arg => {
-    if (!arg) {
-      this.tooltipService.hide({ immediately: true, isTouchEvent: false })
-      this.currentTooltip = null
-      this.viewer.resetSelection()
-      this.selectionManager.clear()
-      return
-    }
-
-    var hit = arg.hits[0]
-    this.viewer.selectObjects([hit.object.id])
-
-    this.showTooltip(hit)
-    this.selectionManager.select(this.selectionIdMap.get(hit.guid), false)
   }
 
-  private onObjectDoubleClicked = arg => {
-    if (!arg) return
-    var hit = arg.hits[0]
-    var selectionId = this.selectionIdMap.get(hit.guid)
-    const screenLoc = projectToScreen(
-      this.viewer.cameraHandler.camera,
-      hit.point
-    )
-    this.selectionManager.showContextMenu(selectionId, screenLoc)
+  private onPointerMove = (_) => {
+    this.moved = true
+  }
+  private onPointerDown = (_) => {
+    this.moved = false
+    this.target.addEventListener('pointermove', this.onPointerMove)
+  }
+  private onPointerUp = (_) => {
+    this.target.removeEventListener('pointermove', this.onPointerMove)
   }
 
-  private createContainerDiv() {
-    var container = this.target.appendChild(document.createElement("div"))
-    container.style.backgroundColor = "transparent"
-    container.style.height = "100%"
-    container.style.width = "100%"
-    container.style.position = "fixed"
-    return container
-  }
+  private onClick = async (ev) => {
+    if (this.moved) return
+    const intersectResult = await this.viewerHandler.intersect({ x: ev.clientX, y: ev.clientY })
+    const multi = isMultiSelect(ev)
+    const hit = intersectResult?.hit
+    if (hit) {
+      const id = hit.object.id as string
 
-  private showTooltip(hit: any) {
-    var selectionId = this.selectionIdMap.get(hit.guid)
-    const screenLoc = projectToScreen(
-      this.viewer.cameraHandler.camera,
-      hit.point
-    )
-    var dataItems = Object.keys(hit.object)
-      .filter(key => !key.startsWith("__"))
-      .map(key => {
-        return {
-          displayName: key,
-          value: hit.object[key]
-        }
-      })
+      if (multi || !this.selectionHandler.isSelected(id))
+        await this.selectionHandler.select(id, multi)
 
-    const tooltipData = {
-      coordinates: [screenLoc.x, screenLoc.y],
-      dataItems: dataItems,
-      identities: [selectionId],
-      isTouchEvent: false
-    }
-
-    this.currentTooltip = {
-      id: hit.object.id,
-      worldPos: hit.point,
-      screenPos: screenLoc,
-      tooltip: tooltipData
-    }
-    this.tooltipService.show(tooltipData)
-  }
-
-  private isLandingPageOn = false
-  private LandingPageRemoved = false
-
-  private LandingPage: Element = null
-
-  private HandleLandingPage(options: VisualUpdateOptions) {
-    console.log("handle landing page")
-    if (
-      !options.dataViews ||
-      !options.dataViews[0]?.metadata?.columns?.length
-    ) {
-      if (!this.isLandingPageOn) {
-        this.isLandingPageOn = true
-        const SampleLandingPage: Element = this.createSampleLandingPage() //create a landing page
-        this.LandingPage = SampleLandingPage
-      }
+      this.tooltipHandler.show(hit, { x: ev.clientX, y: ev.clientY })
+      const selection = this.selectionHandler.getCurrentSelection()
+      const ids = selection.map((s) => s.id)
+      await this.viewerHandler.selectObjects(ids)
     } else {
-      if (this.isLandingPageOn && !this.LandingPageRemoved) {
-        this.LandingPageRemoved = true
-        this.target.removeChild(this.LandingPage)
-        this.isLandingPageOn = false
+      this.tooltipHandler.hide()
+      if (!multi) {
+        this.selectionHandler.clear()
+        await this.viewerHandler.selectObjects(null)
       }
     }
   }
-  createSampleLandingPage(): Element {
-    var container = this.target.appendChild(document.createElement("div"))
-    container.classList.add("speckle-landing")
-
-    var img = document.createElement("div")
-    img.classList.add("speckle-logo")
-    container.appendChild(img)
-
-    var subtext = document.createElement("p")
-    subtext.classList.add("heading")
-    subtext.textContent = "PowerBI 3D Viewer"
-    container.appendChild(subtext)
-
-    var tipContainer = document.createElement("div")
-    tipContainer.classList.add("tip-container")
-
-    var tip = document.createElement("p")
-    tip.textContent = "Getting started 💡"
-    tip.classList.add("tip")
-    tipContainer.appendChild(tip)
-
-    var instructions = document.createElement("p")
-    instructions.classList.add("instructions")
-    instructions.textContent =
-      "Please connect the Stream ID and Object ID fields."
-    tipContainer.appendChild(instructions)
-
-    var instructions2 = document.createElement("p")
-    instructions2.classList.add("instructions")
-    instructions2.textContent =
-      "Optionally, connect the 'Object Data' field to color the objects by a value"
-    tipContainer.appendChild(instructions2)
-
-    var instructions2 = document.createElement("p")
-    instructions2.classList.add("instructions")
-    instructions2.classList.add("docs")
-    instructions2.innerHTML =
-      "For more info, check our docs page <b>https://speckle.guide</b>"
-    tipContainer.appendChild(instructions2)
-
-    container.appendChild(tipContainer)
-    return container
+  private onAuxClick = async (ev) => {
+    if (ev.button != 2 || this.moved) return
+    const intersectResult = await this.viewerHandler.intersect({ x: ev.clientX, y: ev.clientY })
+    await this.selectionHandler.showContextMenu(ev, intersectResult?.hit)
   }
 
-  private getCustomColorGroups(prop: PropertyInfo, customColors: string[]) {
-    var groups: [{ value: number; id?: string; ids?: string[] }] =
-      //@ts-ignore
-      prop.valueGroups
-    if (!groups) return null
-    var colorGrad = interpolate(customColors)
-    return groups.map(group => {
-      //@ts-ignore
-      var color = colorGrad((group.value - prop.min) / (prop.max - prop.min))
-      var objectIds = group.ids ?? [group.id]
-      return {
-        objectIds,
-        color
-      }
-    })
+  public async destroy() {
+    await this.clear()
+    this.viewerHandler.dispose()
+    this.target.removeEventListener('pointerup', this.onPointerUp)
+    this.target.removeEventListener('pointerdown', this.onPointerDown)
+    this.target.removeEventListener('click', this.onClick)
+    this.target.removeEventListener('auxclick', this.onAuxClick)
   }
 }

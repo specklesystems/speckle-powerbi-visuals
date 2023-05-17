@@ -1,6 +1,6 @@
 import 'core-js/stable'
 import 'regenerator-runtime/runtime'
-import './../style/visual.less'
+import '../style/visual.css'
 
 import * as _ from 'lodash'
 import { FormattingSettingsService } from 'powerbi-visuals-utils-formattingmodel'

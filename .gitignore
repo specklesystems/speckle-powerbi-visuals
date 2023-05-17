@@ -5,3 +5,4 @@ webpack.statistics.dev.html
 webpack.statistics.prod.html
 .DS_Store
 .idea/
+webpack.statistics.html

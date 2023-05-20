@@ -1,16 +1,19 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-const path = require('path')
-const fs = require('fs')
-
-// werbpack plugin
-const webpack = require('webpack')
-const PowerBICustomVisualsWebpackPlugin = require('powerbi-visuals-webpack-plugin')
-const MiniCssExtractPlugin = require('mini-css-extract-plugin')
-const Visualizer = require('webpack-bundle-analyzer').BundleAnalyzerPlugin
-const ExtraWatchWebpackPlugin = require('extra-watch-webpack-plugin')
+import path from 'path'
 
 // api configuration
-const powerbiApi = require('powerbi-visuals-api')
+import powerbi from 'powerbi-visuals-api'
+import ExtraWatchWebpackPlugin from 'extra-watch-webpack-plugin'
+import { BundleAnalyzerPlugin as Visualizer } from 'webpack-bundle-analyzer'
+import MiniCssExtractPlugin from 'mini-css-extract-plugin'
+import PowerBICustomVisualsWebpackPlugin from 'powerbi-visuals-webpack-plugin'
+import webpack from 'webpack'
+import fs from 'fs'
+import { WebpackConfiguration } from 'webpack-cli'
+import { VueLoaderPlugin } from 'vue-loader'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const powerbiApi: any = powerbi // Types for PowerBI seem to be off, so I'm instead forcing it to `any`
 
 // visual configuration json path
 const pbivizPath = './pbiviz.json'
@@ -28,36 +31,42 @@ const localizationFolders = fs.existsSync(resourcesFolder) && fs.readdirSync(res
 const statsLocation = '../../webpack.statistics.html'
 
 // babel options to support IE11
-let babelOptions = {
+const babelOptions = {
   presets: [
     [
-      require.resolve('@babel/preset-env'),
+      '@babel/preset-env',
       {
-        targets: {
-          ie: '11'
-        },
         useBuiltIns: 'entry',
         corejs: 3,
         modules: false
       }
     ]
   ],
-  sourceType: 'unambiguous', // tell to babel that the project can contains different module types, not only es2015 modules
-  cacheDirectory: path.join('.tmp', 'babelCache') // path for chace files
+  plugins: [],
+  sourceType: 'unambiguous', // tell to babel that the project can contain different module types, not only es2015 modules
+  cacheDirectory: path.join('.tmp', 'babelCache') // path for cache files
 }
 
-module.exports = {
+const config: WebpackConfiguration = {
   entry: {
-    'visual.js': pluginLocation
+    visual: pluginLocation
   },
   optimization: {
     concatenateModules: false,
-    minimize: true // enable minimization for create *.pbiviz file less than 2 Mb, can be disabled for dev mode
+    minimize: false // enable minimization for create *.pbiviz file less than 2 Mb, can be disabled for dev mode
   },
   devtool: 'source-map',
   mode: 'development',
   module: {
     rules: [
+      {
+        test: /\.vue$/,
+        use: [
+          {
+            loader: 'vue-loader'
+          }
+        ]
+      },
       {
         parser: {
           amd: false
@@ -65,71 +74,64 @@ module.exports = {
       },
       {
         test: /(\.ts)x|\.ts$/,
-        include: /.tmp|powerbi-visuals-|src|precompile\\visualPlugin.ts/,
         use: [
           {
-            loader: require.resolve('babel-loader'),
-            options: babelOptions
+            loader: 'babel-loader',
+            options: {
+              presets: [
+                // '@babel/react',
+                '@babel/env'
+              ]
+            }
           },
           {
-            loader: require.resolve('ts-loader'),
+            loader: 'ts-loader',
             options: {
               transpileOnly: false,
-              experimentalWatchApi: false
+              experimentalWatchApi: false,
+              appendTsSuffixTo: [/\.vue$/]
             }
           }
-        ]
+        ],
+        exclude: [/node_modules/],
+        include: /.tmp|powerbi-visuals-|src|precompile\\visualPlugin.ts/
       },
       {
         test: /(\.js)x|\.js$/,
         use: [
           {
-            loader: require.resolve('babel-loader'),
+            loader: 'babel-loader',
             options: babelOptions
           }
-        ]
+        ],
+        exclude: [/node_modules/]
       },
       {
         test: /\.json$/,
-        loader: require.resolve('json-loader'),
+        loader: 'json-loader',
         type: 'javascript/auto'
       },
       {
-        test: /\.css$/,
-        use: [
-          {
-            loader: MiniCssExtractPlugin.loader
-          },
-          {
-            loader: require.resolve('css-loader')
-          }
-        ]
+        test: /\.(css|scss)?$/,
+        use: [MiniCssExtractPlugin.loader, 'css-loader', 'postcss-loader']
       },
       {
-        test: /\.(woff|ttf|ico|woff2|jpg|jpeg|png|webp)$/i,
-        use: [
-          {
-            loader: 'base64-inline-loader'
-          }
-        ]
+        test: /\.(woff|ttf|ico|woff2|jpg|jpeg|png|webp|svg)$/i,
+        use: ['base64-inline-loader']
       }
     ]
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.jsx', '.js', '.css']
+    extensions: ['.tsx', '.ts', '.jsx', '.js', '.css'],
+    alias: {}
   },
   output: {
+    publicPath: '/assets',
     path: path.join(__dirname, '/.tmp', 'drop'),
-    publicPath: 'assets',
-    filename: '[name]',
-    sourceMapFilename: '[name].js.map',
-    // if API version of the visual is higer/equal than 3.2.0 add library and libraryTarget options into config
-    // API version less that 3.2.0 doesn't require it
     library: +powerbiApi.version.replace(/\./g, '') >= 320 ? pbivizFile.visual.guid : undefined,
     libraryTarget: +powerbiApi.version.replace(/\./g, '') >= 320 ? 'var' : undefined
   },
   devServer: {
-    allowedHosts: 'all',
     static: {
       directory: path.join(__dirname, '.tmp', 'drop'), // path with assets for dev server, they are generated by webpack plugin
       publicPath: '/assets'
@@ -137,14 +139,8 @@ module.exports = {
     compress: true,
     port: 8080, // dev server port
     hot: false,
-    // cert files for dev server
-    https: {
-      // keep it commented to use webpack generated certificate
-      // key: path.join(__dirname, "certs","PowerBICustomVisualTest_public.key"), // for darwin, linux
-      // cert: path.join(__dirname, "certs", "PowerBICustomVisualTest_public.cer"), // for darwin, linux
-      // pfx: fs.readFileSync(path.join(__dirname, "certs", "PowerBICustomVisualTest_public.pfx")), // for windows
-      // passphrase: "5031595470751755"
-    },
+    https: {},
+    liveReload: false,
     headers: {
       'access-control-allow-origin': '*',
       'cache-control': 'public, max-age=0'
@@ -163,6 +159,7 @@ module.exports = {
           realWindow: "Function('return this')()"
         },
   plugins: [
+    new VueLoaderPlugin(),
     new MiniCssExtractPlugin({
       filename: 'visual.css',
       chunkFilename: '[id].css'
@@ -179,6 +176,7 @@ module.exports = {
     // custom visuals plugin instance with options
     new PowerBICustomVisualsWebpackPlugin({
       ...pbivizFile,
+      compression: 0,
       capabilities: capabilitiesFile,
       stringResources:
         localizationFolders &&
@@ -191,8 +189,10 @@ module.exports = {
       stringResourcesSchema: powerbiApi.schemas.stringResources,
       dependenciesSchema: powerbiApi.schemas.dependencies,
       devMode: false,
-      generatePbiviz: true,
+      generatePbiviz: false,
       generateResources: true,
+      minifyJS: false,
+      minify: false,
       modules: true,
       visualSourceLocation: '../../src/visual',
       pluginLocation: pluginLocation,
@@ -212,3 +212,5 @@ module.exports = {
         })
   ]
 }
+
+export default config

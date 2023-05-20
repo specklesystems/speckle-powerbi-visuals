@@ -1,7 +1,6 @@
 import 'core-js/stable'
 import 'regenerator-runtime/runtime'
 import '../style/visual.css'
-
 import * as _ from 'lodash'
 import { FormattingSettingsService } from 'powerbi-visuals-utils-formattingmodel'
 
@@ -21,6 +20,9 @@ import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
 import IVisual = powerbi.extensibility.visual.IVisual
 import ITooltipService = powerbi.extensibility.ITooltipService
 import { isMultiSelect } from './utils/isMultiSelect'
+import { createApp } from 'vue'
+
+import App from './App.vue'
 
 // noinspection JSUnusedGlobalSymbols
 export class Visual implements IVisual {
@@ -42,6 +44,14 @@ export class Visual implements IVisual {
     Tracker.loaded()
     this.host = options.host
     this.target = options.element
+
+    const vueApp = createApp(App, {
+      dataView: { wooooo: 'hooooo' },
+      onSpeckle(args) {
+        console.log('THIS WAS MOUNTED!!', args)
+      }
+    })
+    vueApp.mount(this.target)
     this.formattingSettingsService = new FormattingSettingsService()
 
     console.log('🚀 Init handlers')
@@ -192,10 +202,12 @@ export class Visual implements IVisual {
   private onPointerMove = (_) => {
     this.moved = true
   }
+
   private onPointerDown = (_) => {
     this.moved = false
     this.target.addEventListener('pointermove', this.onPointerMove)
   }
+
   private onPointerUp = (_) => {
     this.target.removeEventListener('pointermove', this.onPointerMove)
   }

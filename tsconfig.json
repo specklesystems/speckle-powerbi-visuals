@@ -11,8 +11,25 @@
     "lib": ["es2020", "dom"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "types": []
+    "types": [],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@assets/*": [
+        "./assets/*"
+      ]
+    }
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS",
+      "esModuleInterop": true
+    }
   },
   "files": ["./src/visual.ts"],
-  "include": ["./src/**/*.ts"]
+  "include": ["./src/**/*.ts", "./src/**/*.vue"],
+  "exclude": [
+    "webpack.config.dev.ts"
+  ]
 }

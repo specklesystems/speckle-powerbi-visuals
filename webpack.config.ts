@@ -62,11 +62,7 @@ const config: WebpackConfiguration = {
     rules: [
       {
         test: /\.vue$/,
-        use: [
-          {
-            loader: 'vue-loader'
-          }
-        ]
+        use: ['vue-loader']
       },
       {
         parser: {

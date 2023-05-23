@@ -17,7 +17,7 @@
     },
     {
       "displayName": "Color By",
-      "kind": "GroupingOrMeasure",
+      "kind": "Grouping",
       "name": "objectColorBy"
     },
     {

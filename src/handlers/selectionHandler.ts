@@ -4,8 +4,6 @@ export default class SelectionHandler {
   private selectionManager: powerbi.extensibility.ISelectionManager
   private host: powerbi.extensibility.visual.IVisualHost
 
-  public PingScreenPosition: (worldPosition) => { x: number; y: number }
-
   public constructor(host: powerbi.extensibility.visual.IVisualHost) {
     this.host = host
     this.selectionManager = this.host.createSelectionManager()

@@ -16,5 +16,3 @@ export interface SpeckleDataInput {
   objectTooltipData: Map<string, IViewerTooltip>
   view: powerbi.DataViewMatrix
 }
-
-export class AbortedError extends Error {}

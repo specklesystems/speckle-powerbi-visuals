@@ -7,7 +7,6 @@ import { storeKey } from 'src/injectionKeys'
 
 let store = useStore(storeKey)
 let status = computed(() => {
-  console.log('Status from store changed', store.state.status)
   return store.state.status
 })
 </script>

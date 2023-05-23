@@ -8,8 +8,6 @@ export default class TooltipHandler {
   private tooltipService: ITooltipService
   public currentTooltip: SpeckleTooltip = null
 
-  public PingScreenPosition: (worldPosition) => { x: number; y: number } = null
-
   constructor(tooltipService) {
     this.tooltipService = tooltipService
     this.data = new Map<string, IViewerTooltip>()

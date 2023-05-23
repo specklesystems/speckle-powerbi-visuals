@@ -125,7 +125,7 @@ export function processMatrixView(
           })
         })
       } else {
-        console.log('🖌️✅ HAS COLOR FILTER', parentObjectIdChild)
+        console.log('🖌️✅ HAS COLOR FILTER')
         if (previousPalette) host.colorPalette['colorPalette'] = previousPalette
         parentObjectIdChild.children?.forEach((colorByChild) => {
           const color = host.colorPalette.getColor(colorByChild.value as string)

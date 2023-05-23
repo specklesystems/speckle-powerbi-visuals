@@ -20,7 +20,6 @@ export const store = createStore<SpeckleVisualState>({
       state.input = input
     },
     setStatus(state, status: InputState) {
-      console.log('Setting status', status)
       state.status = status ?? 'invalid'
     },
     clearInput(state) {

@@ -24,9 +24,9 @@ import ITooltipService = powerbi.extensibility.ITooltipService
 // noinspection JSUnusedGlobalSymbols
 export class Visual implements IVisual {
   private readonly host: powerbi.extensibility.visual.IVisualHost
-
   private selectionHandler: SelectionHandler
   private tooltipHandler: TooltipHandler
+
   private formattingSettings: SpeckleVisualSettingsModel
   private formattingSettingsService: FormattingSettingsService
 
@@ -48,19 +48,6 @@ export class Visual implements IVisual {
       .provide(tooltipHandlerKey, this.tooltipHandler)
       .provide(hostKey, options.host)
       .mount(options.element)
-
-    console.log('🚀 Setup handler events')
-    // this.viewerHandler.OnCameraUpdate = _.throttle((args) => {
-    //   this.tooltipHandler.move()
-    // }, 1000.0 / 60.0).bind(this)
-
-    // this.tooltipHandler.PingScreenPosition = this.viewerHandler.getScreenPosition.bind(
-    //   this.viewerHandler
-    // )
-
-    // this.selectionHandler.PingScreenPosition = this.viewerHandler.getScreenPosition.bind(
-    //   this.viewerHandler
-    // )
 
     // SpeckleVisualSettings.OnSettingsChanged = (oldSettings, newSettings) => {
     //   this.viewerHandler.changeSettings(oldSettings, newSettings)
@@ -103,7 +90,8 @@ export class Visual implements IVisual {
       case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
         return
       default:
-        console.log('⤴️ Update type', options.type)
+        // @ts-ignore
+        console.log('⤴️ Update type', powerbi.VisualUpdateType[options.type])
         try {
           this.throttleUpdate(
             processMatrixView(

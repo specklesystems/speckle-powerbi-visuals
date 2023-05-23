@@ -61,7 +61,6 @@ export default class ViewerHandler {
   }
 
   public changeSettings(oldSettings: SpeckleVisualSettings, newSettings: SpeckleVisualSettings) {
-    console.log('Changing settings in viewer')
     if (oldSettings.camera.orthoMode != newSettings.camera.orthoMode) {
       Tracker.settingsChanged(SettingsChangedType.OrthoMode)
       if (newSettings.camera.orthoMode) this.viewer.cameraHandler?.setOrthoCameraOn()
@@ -89,7 +88,6 @@ export default class ViewerHandler {
     signal?: AbortSignal,
     onObjectUnloaded?: (url: string) => void
   ) {
-    console.log('Unloading objects')
     for (const url of objects) {
       if (signal?.aborted) return
       await this.viewer

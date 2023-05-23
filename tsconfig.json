@@ -12,11 +12,12 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "types": [],
+    "baseUrl": "./",
     "paths": {
-      "@/*": [
+      "src/*": [
         "./src/*"
       ],
-      "@assets/*": [
+      "assets/*": [
         "./assets/*"
       ]
     }

@@ -11,6 +11,7 @@ import webpack from 'webpack'
 import fs from 'fs'
 import { WebpackConfiguration } from 'webpack-cli'
 import { VueLoaderPlugin } from 'vue-loader'
+import { TsconfigPathsPlugin } from 'tsconfig-paths-webpack-plugin'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const powerbiApi: any = powerbi // Types for PowerBI seem to be off, so I'm instead forcing it to `any`
@@ -171,6 +172,7 @@ const config: WebpackConfiguration = {
         },
   plugins: [
     new VueLoaderPlugin(),
+    new TsconfigPathsPlugin(),
     new MiniCssExtractPlugin({
       filename: 'visual.css',
       chunkFilename: '[id].css'

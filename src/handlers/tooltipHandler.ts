@@ -46,9 +46,8 @@ export default class TooltipHandler {
     this.currentTooltip = null
   }
 
-  public move() {
+  public move(pos: { x: number; y: number }) {
     if (!this.currentTooltip) return
-    const pos = this.PingScreenPosition(this.currentTooltip.worldPos)
     this.currentTooltip.tooltip.coordinates = [pos.x, pos.y]
     this.tooltipService.move(this.currentTooltip.tooltip)
   }

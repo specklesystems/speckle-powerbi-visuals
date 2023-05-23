@@ -1,31 +1,20 @@
-<script lang="ts">
-import { defineComponent } from 'vue'
-import { CommonLoadingBar } from '@speckle/ui-components'
-export default defineComponent({
-  name: 'App',
-  components: { CommonLoadingBar },
-  props: {
-    dataView: Object
-  },
-  emits: ['speckle'],
-  data() {
-    return {}
-  },
-  mounted() {
-    this.$emit('speckle', { some: 123, thing: this.dataView })
-  },
-  methods: {
-    testSPECKLE() {
-      console.error('THIS IS A TEST')
-    }
-  }
+<script setup lang="ts">
+import HomeView from './views/HomeView.vue'
+import ViewerView from './views/ViewerView.vue'
+import { computed } from 'vue'
+import { useStore } from 'vuex'
+import { storeKey } from 'src/injectionKeys'
+
+let store = useStore(storeKey)
+let status = computed(() => {
+  console.log('Status from store changed', store.state.status)
+  return store.state.status
 })
 </script>
 
 <template>
-  <h1 class="text-3xl font-bold">Hello</h1>
-  <p class="text-secondary">Hello there</p>
-  <common-loading-bar loading>Loading....</common-loading-bar>
+  <ViewerView v-if="status == 'valid'" />
+  <HomeView v-else />
 </template>
 
 <style scoped></style>

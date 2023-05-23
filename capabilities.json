@@ -37,18 +37,18 @@
           },
           "select": [
             {
-              "for": {
-                "in": "stream"
+              "bind": {
+                "to": "stream"
               }
             },
             {
-              "for": {
-                "in": "parentObject"
+              "bind": {
+                "to": "parentObject"
               }
             },
             {
-              "for": {
-                "in": "objectColorBy"
+              "bind": {
+                "to": "objectColorBy"
               }
             },
             {

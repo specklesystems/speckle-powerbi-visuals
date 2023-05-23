@@ -1,8 +1,9 @@
 /** @type {import("eslint").Linter.Config} */
 const config = {
   root: true,
-  parser: '@typescript-eslint/parser',
+  parser: 'vue-eslint-parser',
   parserOptions: {
+    parser: '@typescript-eslint/parser',
     requireConfigFile: false,
     ecmaVersion: 2020,
     sourceType: 'module'
@@ -10,6 +11,7 @@ const config = {
   plugins: ['@typescript-eslint'],
   extends: [
     'eslint:recommended',
+    'plugin:vue/vue3-recommended',
     'plugin:@typescript-eslint/eslint-recommended',
     'plugin:@typescript-eslint/recommended',
     'prettier'

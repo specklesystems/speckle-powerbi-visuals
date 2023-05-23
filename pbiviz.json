@@ -13,7 +13,7 @@
   "author": { "name": "Speckle Systems", "email": "info@speckle.systems" },
   "assets": { "icon": "assets/logo.png" },
   "externalJS": [],
-  "style": "style/visual.less",
+  "style": "style/visual.css",
   "capabilities": "capabilities.json",
   "dependencies": null,
   "stringResources": []

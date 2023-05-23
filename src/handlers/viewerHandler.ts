@@ -3,9 +3,11 @@ import {
   FilteringState,
   Viewer,
   IntersectionQuery,
-  DefaultViewerParams
+  DefaultViewerParams,
+  Box3,
+  SpeckleView
 } from '@speckle/viewer'
-import { createViewerContainerDiv, pickViewableHit, projectToScreen } from '../utils/viewerUtils'
+import { pickViewableHit, projectToScreen } from '../utils/viewerUtils'
 import { SpeckleVisualSettings } from '../settings'
 import { SettingsChangedType, Tracker } from '../utils/mixpanel'
 import _ from 'lodash'
@@ -19,19 +21,46 @@ export default class ViewerHandler {
     authToken: null,
     batchSize: 25
   }
+  private currentSectionBox: Box3 = null
 
-  public OnCameraUpdate: () => void
+  public getViews() {
+    return this.viewer.getViews()
+  }
+
+  public setView(view: SpeckleView | CanonicalView) {
+    this.viewer.setView(view)
+    if (typeof view === 'string') this.viewer.zoom([...this.loadedObjectsCache], 10, false)
+  }
+
+  public setSectionBox(active: boolean, objectIds: string[]) {
+    if (active) {
+      if (this.currentSectionBox === null) {
+        const bbox = this.viewer.getSectionBoxFromObjects(objectIds)
+        this.viewer.setSectionBox(bbox)
+        this.currentSectionBox = bbox
+      } else {
+        const bbox = this.viewer.getCurrentSectionBox()
+        if (bbox) this.currentSectionBox = bbox
+      }
+      this.viewer.sectionBoxOn()
+    } else {
+      this.viewer.sectionBoxOff()
+    }
+    this.viewer.requestRender()
+  }
+
+  public addCameraUpdateEventListener(listener: (ev) => void) {
+    this.viewer.cameraHandler.controls.addEventListener('update', listener)
+  }
+  public removeCameraUpdateEventListener(listener: (ev) => void) {
+    this.viewer.cameraHandler.controls.removeEventListener('update', listener)
+  }
 
   public constructor(parent: HTMLElement) {
     this.parent = parent
   }
 
-  private onCameraUpdate(args) {
-    if (this.OnCameraUpdate) this.OnCameraUpdate()
-  }
-
   public changeSettings(oldSettings: SpeckleVisualSettings, newSettings: SpeckleVisualSettings) {
-    console.log('Changing settings in viewer')
     if (oldSettings.camera.orthoMode != newSettings.camera.orthoMode) {
       Tracker.settingsChanged(SettingsChangedType.OrthoMode)
       if (newSettings.camera.orthoMode) this.viewer.cameraHandler?.setOrthoCameraOn()
@@ -46,20 +75,12 @@ export default class ViewerHandler {
 
   public async init() {
     if (this.viewer) return
-    console.log('Initializing viewer')
-    const container = createViewerContainerDiv(this.parent)
     const viewerSettings = DefaultViewerParams
     viewerSettings.showStats = false
     viewerSettings.verbose = false
-    const viewer = new Viewer(container, viewerSettings)
-
+    const viewer = new Viewer(this.parent, viewerSettings)
     await viewer.init()
-
-    // Setup any events here (progress, load-complete...)
-    viewer.cameraHandler.controls.addEventListener('update', this.onCameraUpdate.bind(this))
-
     this.viewer = viewer
-    console.log('Viewer initialized')
   }
 
   public async unloadObjects(
@@ -67,7 +88,6 @@ export default class ViewerHandler {
     signal?: AbortSignal,
     onObjectUnloaded?: (url: string) => void
   ) {
-    console.log('Unloading objects')
     for (const url of objects) {
       if (signal?.aborted) return
       await this.viewer
@@ -96,7 +116,6 @@ export default class ViewerHandler {
     onError: (url: string, error: Error) => void,
     signal: AbortSignal
   ) {
-    console.groupCollapsed('Loading objects')
     try {
       let index = 0
       let promises = []
@@ -125,8 +144,6 @@ export default class ViewerHandler {
       await Promise.all(promises)
     } catch (error) {
       throw new Error(`Load objects failed: ${error}`)
-    } finally {
-      console.groupEnd()
     }
   }
 

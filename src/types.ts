@@ -8,7 +8,7 @@ export interface IViewerTooltip {
   data: IViewerTooltipData[]
 }
 
-export type SpeckleDataInput = {
+export interface SpeckleDataInput {
   objectsToLoad: string[]
   objectIds: string[]
   selectedIds: string[]

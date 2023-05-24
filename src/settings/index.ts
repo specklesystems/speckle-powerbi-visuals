@@ -38,8 +38,4 @@ export class SpeckleVisualSettings extends DataViewObjectsParser {
     this.OnSettingsChanged(this.current, newSettings)
     this.current = newSettings
   }
-
-  public static async handleSettingsModelUpdate(newSettings: SpeckleVisualSettingsModel) {
-    this.current.color.background = newSettings.colorsCard.backgroundColorSlice.value.value
-  }
 }

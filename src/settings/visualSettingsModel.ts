@@ -7,45 +7,43 @@ import FormattingSettingsSlice = formattingSettings.Slice
 
 export class SpeckleVisualSettingsModel extends FormattingSettingsModel {
   // Building my visual formatting settings card
-  colorsCard: SpeckleVisualColorSettingsCard = new SpeckleVisualColorSettingsCard()
+  color: SpeckleVisualColorSettingsCard = new SpeckleVisualColorSettingsCard()
 
   // Add formatting settings card to cards list in model
-  cards = [this.colorsCard]
+  cards = [this.color]
 }
 
 class SpeckleVisualColorSettingsCard extends FormattingSettingsCard {
-  public startColorSlice = new formattingSettings.ColorPicker({
+  public startColor = new formattingSettings.ColorPicker({
     name: 'startColor',
     displayName: 'Start Color',
-    value: { value: '#ffffff' },
-    defaultColor: { value: '#ffffff' }
+    value: { value: '#ffffff' }
   })
 
-  public midColorSlice = new formattingSettings.ColorPicker({
+  public midColor = new formattingSettings.ColorPicker({
     name: 'midColor',
     displayName: 'Mid Color',
-    value: { value: SpeckleVisualSettings.current.color.midColor }
+    value: { value: 'yellow' }
   })
 
-  public endColorSlice = new formattingSettings.ColorPicker({
+  public endColor = new formattingSettings.ColorPicker({
     name: 'endColor',
     displayName: 'End Color',
-    value: { value: SpeckleVisualSettings.current.color.endColor }
+    value: { value: 'lightblue' }
   })
 
-  public backgroundColorSlice = new formattingSettings.ColorPicker({
-    name: 'backgroundColor',
+  public background = new formattingSettings.ColorPicker({
+    name: 'background',
     displayName: 'Background Color',
-    value: { value: SpeckleVisualSettings.current.color.background }
+    value: { value: 'green' }
   })
 
-  name = 'speckleVisual_colors'
-  displayName = 'Colors'
-  analyticsPane = false
-  slices: Array<FormattingSettingsSlice> = [
-    this.startColorSlice,
-    this.midColorSlice,
-    this.endColorSlice,
-    this.backgroundColorSlice
+  name = 'color'
+  displayName = 'Color'
+  slices: FormattingSettingsSlice[] = [
+    this.startColor,
+    this.midColor,
+    this.endColor,
+    this.background
   ]
 }

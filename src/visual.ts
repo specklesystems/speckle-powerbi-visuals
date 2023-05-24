@@ -59,10 +59,15 @@ export class Visual implements IVisual {
   }
 
   public update(options: VisualUpdateOptions) {
+    // @ts-ignore
+    console.log('⤴️ Update type', powerbi.VisualUpdateType[options.type])
+    console.log('Formatting settings', this.formattingSettings)
     this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
       SpeckleVisualSettingsModel,
       options.dataViews
     )
+    console.log('Populated settings', this.formattingSettings)
+
     //SpeckleVisualSettings.handleSettingsModelUpdate(this.formattingSettings)
 
     let validationResult: { hasColorFilter: boolean; view: powerbi.DataViewMatrix } = null
@@ -90,8 +95,6 @@ export class Visual implements IVisual {
       case powerbi.VisualUpdateType.Resize + powerbi.VisualUpdateType.ResizeEnd:
         return
       default:
-        // @ts-ignore
-        console.log('⤴️ Update type', powerbi.VisualUpdateType[options.type])
         try {
           this.throttleUpdate(
             processMatrixView(

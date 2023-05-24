@@ -120,20 +120,8 @@
       }
     },
     "color": {
-      "displayName": "Color",
       "properties": {
-        "background": {
-          "displayName": "Background Color",
-          "type": {
-            "fill": {
-              "solid": {
-                "color": true
-              }
-            }
-          }
-        },
-        "endColor": {
-          "displayName": "End Color",
+        "startColor": {
           "type": {
             "fill": {
               "solid": {
@@ -143,7 +131,6 @@
           }
         },
         "midColor": {
-          "displayName": "Middle Color",
           "type": {
             "fill": {
               "solid": {
@@ -152,8 +139,16 @@
             }
           }
         },
-        "startColor": {
-          "displayName": "Start Color",
+        "endColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "background": {
           "type": {
             "fill": {
               "solid": {

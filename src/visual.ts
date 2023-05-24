@@ -60,13 +60,12 @@ export class Visual implements IVisual {
 
   public update(options: VisualUpdateOptions) {
     // @ts-ignore
-    console.log('⤴️ Update type', powerbi.VisualUpdateType[options.type])
-    console.log('Formatting settings', this.formattingSettings)
+    console.log('⤴️ Update type 👉', powerbi.VisualUpdateType[options.type])
     this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
       SpeckleVisualSettingsModel,
       options.dataViews
     )
-    console.log('Populated settings', this.formattingSettings)
+    store.commit('setSettings', this.formattingSettings)
 
     //SpeckleVisualSettings.handleSettingsModelUpdate(this.formattingSettings)
 
@@ -75,7 +74,6 @@ export class Visual implements IVisual {
       console.log('🔍 Validating input...', options)
       validationResult = validateMatrixView(options)
       console.log('✅Input valid', validationResult)
-      store.commit('setStatus', 'valid')
     } catch (e) {
       console.log('❌Input not valid:', (e as Error).message)
       this.host.displayWarningIcon(

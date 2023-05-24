@@ -72,7 +72,6 @@
   ],
   "objects": {
     "camera": {
-      "displayName": "Camera",
       "properties": {
         "defaultView": {
           "displayName": "Default view",
@@ -111,17 +110,26 @@
             ]
           }
         },
-        "orthoMode": {
-          "displayName": "Ortho mode",
+        "projection": {
+          "displayName": "Projection",
           "type": {
-            "bool": true
+            "enumeration": [
+              {
+                "displayName": "Perspective",
+                "value": "perspective"
+              },
+              {
+                "displayName": "Orthographic",
+                "value": "orthographic"
+              }
+            ]
           }
         }
       }
     },
     "color": {
       "properties": {
-        "startColor": {
+        "start": {
           "type": {
             "fill": {
               "solid": {
@@ -130,7 +138,7 @@
             }
           }
         },
-        "midColor": {
+        "mid": {
           "type": {
             "fill": {
               "solid": {
@@ -139,7 +147,7 @@
             }
           }
         },
-        "endColor": {
+        "end": {
           "type": {
             "fill": {
               "solid": {
@@ -155,6 +163,45 @@
                 "color": true
               }
             }
+          }
+        }
+      }
+    },
+    "lighting": {
+      "properties": {
+        "enabled": {
+          "type": {
+            "bool": true
+          }
+        },
+        "intensity": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "elevation": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "azimuth": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "indirect": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "shadows": {
+          "type": {
+            "bool": true
+          }
+        },
+        "shadowCatcher": {
+          "type": {
+            "bool": true
           }
         }
       }
@@ -176,6 +223,11 @@
     {
       "essential": false,
       "name": "ExportContent"
+    },
+    {
+      "essential": true,
+      "name": "LocalStorage",
+      "parameters": []
     }
   ],
   "sorting": {

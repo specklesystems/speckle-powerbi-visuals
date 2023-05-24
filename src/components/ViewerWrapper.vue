@@ -2,7 +2,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, Ref, ref, watch, watchEffect } from 'vue'
 import { useStore } from 'vuex'
 import ViewerControls from 'src/components/ViewerControls.vue'
-import { SpeckleView } from '@speckle/viewer'
+import { CanonicalView, SpeckleView } from '@speckle/viewer'
 import { CommonLoadingBar } from '@speckle/ui-components'
 import ViewerHandler from 'src/handlers/viewerHandler'
 import { useClickDragged } from 'src/composables/useClickDragged'
@@ -27,6 +27,7 @@ let setupTask: Promise<void> = null
 
 const isLoading = computed(() => updateTask.value != null)
 const input = computed(() => store.state.input)
+const settings = computed(() => store.state.settings)
 
 const onCameraMoved = throttle((_) => {
   const pos = tooltipHandler.currentTooltip?.worldPos
@@ -40,18 +41,20 @@ onMounted(() => {
   setupTask = viewerHandler
     .init()
     .then(() => viewerHandler.addCameraUpdateEventListener(onCameraMoved))
-    .finally(() => {
-      if (input.value) cancelAndHandleDataUpdate()
+    .finally(async () => {
+      if (input.value) await cancelAndHandleDataUpdate()
+      viewerHandler.setView(settings.value.camera.defaultView.value as CanonicalView)
     })
 })
 
 onBeforeUnmount(async () => {
   await viewerHandler.dispose()
-  viewerHandler = null
 })
 
 const debounceUpdate = debounce(cancelAndHandleDataUpdate, 500)
+const debounceSettingsUpdate = debounce(() => viewerHandler.updateSettings(settings.value), 500)
 watch(input, debounceUpdate)
+watch(settings, debounceSettingsUpdate)
 
 watchEffect(() => {
   if (!isLoading.value) viewerHandler?.setSectionBox(bboxActive.value, input.value.objectIds)
@@ -96,7 +99,7 @@ function handleDataUpdate(input: Ref<SpeckleDataInput>, signal: AbortSignal) {
 async function cancelAndHandleDataUpdate() {
   console.log('Input has changed', input.value)
   if (updateTask.value) {
-    ac.abort()
+    ac.abort('New input is available')
     console.log('Cancelling previous load job')
     await updateTask
     ac = new AbortController()

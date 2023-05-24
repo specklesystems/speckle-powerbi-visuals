@@ -1,49 +1,15 @@
-import { formattingSettings } from 'powerbi-visuals-utils-formattingmodel'
-import { SpeckleVisualSettings } from './'
+import { formattingSettings as fs } from 'powerbi-visuals-utils-formattingmodel'
+import { ColorSettings } from 'src/settings/colorSettings'
+import { CameraSettings } from 'src/settings/cameraSettings'
+import { LightingSettings } from 'src/settings/lightingSettings'
 
-import FormattingSettingsCard = formattingSettings.Card
-import FormattingSettingsModel = formattingSettings.Model
-import FormattingSettingsSlice = formattingSettings.Slice
-
-export class SpeckleVisualSettingsModel extends FormattingSettingsModel {
+export class SpeckleVisualSettingsModel extends fs.Model {
   // Building my visual formatting settings card
-  color: SpeckleVisualColorSettingsCard = new SpeckleVisualColorSettingsCard()
+  color: ColorSettings = new ColorSettings()
 
-  // Add formatting settings card to cards list in model
-  cards = [this.color]
-}
+  camera: CameraSettings = new CameraSettings()
 
-class SpeckleVisualColorSettingsCard extends FormattingSettingsCard {
-  public startColor = new formattingSettings.ColorPicker({
-    name: 'startColor',
-    displayName: 'Start Color',
-    value: { value: '#ffffff' }
-  })
+  lighting: LightingSettings = new LightingSettings()
 
-  public midColor = new formattingSettings.ColorPicker({
-    name: 'midColor',
-    displayName: 'Mid Color',
-    value: { value: 'yellow' }
-  })
-
-  public endColor = new formattingSettings.ColorPicker({
-    name: 'endColor',
-    displayName: 'End Color',
-    value: { value: 'lightblue' }
-  })
-
-  public background = new formattingSettings.ColorPicker({
-    name: 'background',
-    displayName: 'Background Color',
-    value: { value: 'green' }
-  })
-
-  name = 'color'
-  displayName = 'Color'
-  slices: FormattingSettingsSlice[] = [
-    this.startColor,
-    this.midColor,
-    this.endColor,
-    this.background
-  ]
+  cards = [this.color, this.camera, this.lighting]
 }

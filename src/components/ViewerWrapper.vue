@@ -74,17 +74,21 @@ function handleDataUpdate(input: Ref<SpeckleDataInput>, signal: AbortSignal) {
         console.error,
         signal
       )
-      signal.throwIfAborted()
       // Color
-      await viewerHandler.colorObjectsByGroup(input.value.colorByIds)
+      if (input.value.colorByIds) await viewerHandler.colorObjectsByGroup(input.value.colorByIds)
+      else
+        await viewerHandler.colorObjectsByGroup([
+          {
+            color: settings.value.color.fill.value.value,
+            objectIds: input.value.objectIds
+          }
+        ])
 
       // Select
       await viewerHandler.unIsolateObjects()
       if (input.value.selectedIds.length == 0)
         await viewerHandler.isolateObjects(input.value.objectIds, true)
       else await viewerHandler.isolateObjects(input.value.selectedIds, true)
-
-      signal.throwIfAborted()
       // Update available views
       views.value = viewerHandler.getViews()
     })

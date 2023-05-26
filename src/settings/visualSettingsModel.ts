@@ -1,15 +1,17 @@
 import { formattingSettings as fs } from 'powerbi-visuals-utils-formattingmodel'
-import { ColorSettings } from 'src/settings/colorSettings'
+import { ColorSelectorSettings, ColorSettings } from 'src/settings/colorSettings'
 import { CameraSettings } from 'src/settings/cameraSettings'
 import { LightingSettings } from 'src/settings/lightingSettings'
 
 export class SpeckleVisualSettingsModel extends fs.Model {
   // Building my visual formatting settings card
-  color: ColorSettings = new ColorSettings()
+  public color: ColorSettings = new ColorSettings()
 
-  camera: CameraSettings = new CameraSettings()
+  public colorSelector: ColorSelectorSettings = new ColorSelectorSettings()
 
-  lighting: LightingSettings = new LightingSettings()
+  public camera: CameraSettings = new CameraSettings()
 
-  cards = [this.color, this.camera, this.lighting]
+  public lighting: LightingSettings = new LightingSettings()
+
+  cards = [this.color, this.colorSelector, this.camera, this.lighting]
 }

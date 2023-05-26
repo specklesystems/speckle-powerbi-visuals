@@ -20,6 +20,11 @@ import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructor
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
 import IVisual = powerbi.extensibility.visual.IVisual
 import ITooltipService = powerbi.extensibility.ITooltipService
+import {
+  createDataViewWildcardSelector,
+  DataViewWildcardMatchingOption
+} from 'powerbi-visuals-utils-dataviewutils/lib/dataViewWildcard'
+import { ColorSelectorSettings } from 'src/settings/colorSettings'
 
 // noinspection JSUnusedGlobalSymbols
 export class Visual implements IVisual {
@@ -34,7 +39,6 @@ export class Visual implements IVisual {
   public constructor(options: VisualConstructorOptions) {
     Tracker.loaded()
     this.host = options.host
-
     this.formattingSettingsService = new FormattingSettingsService()
 
     console.log('🚀 Init handlers')
@@ -48,10 +52,6 @@ export class Visual implements IVisual {
       .provide(tooltipHandlerKey, this.tooltipHandler)
       .provide(hostKey, options.host)
       .mount(options.element)
-
-    // SpeckleVisualSettings.OnSettingsChanged = (oldSettings, newSettings) => {
-    //   this.viewerHandler.changeSettings(oldSettings, newSettings)
-    // }
   }
 
   private async clear() {
@@ -65,10 +65,8 @@ export class Visual implements IVisual {
       SpeckleVisualSettingsModel,
       options.dataViews
     )
-    store.commit('setSettings', this.formattingSettings)
 
-    //SpeckleVisualSettings.handleSettingsModelUpdate(this.formattingSettings)
-
+    console.log('Selector colors', this.formattingSettings.colorSelector)
     let validationResult: { hasColorFilter: boolean; view: powerbi.DataViewMatrix } = null
     try {
       console.log('🔍 Validating input...', options)
@@ -94,28 +92,30 @@ export class Visual implements IVisual {
         return
       default:
         try {
-          this.throttleUpdate(
-            processMatrixView(
-              validationResult.view,
-              this.host,
-              validationResult.hasColorFilter,
-              (obj, id) => this.selectionHandler.set(obj, id)
-            )
+          const input = processMatrixView(
+            validationResult.view,
+            this.host,
+            validationResult.hasColorFilter,
+            (obj, id) => this.selectionHandler.set(obj, id)
           )
+          this.throttleUpdate(input)
         } catch (error) {
           console.error('Data update error', error ?? 'Unknown')
         }
     }
   }
-
   public getFormattingModel(): powerbi.visuals.FormattingModel {
-    return this.formattingSettingsService.buildFormattingModel(this.formattingSettings)
+    console.log('Showing Formatting settings', this.formattingSettings)
+    const model = this.formattingSettingsService.buildFormattingModel(this.formattingSettings)
+    console.log('Formatting model was created', model)
+    return model
   }
 
   private throttleUpdate = _.throttle((input: SpeckleDataInput) => {
     this.tooltipHandler.setup(input.objectTooltipData)
     store.commit('setInput', input)
     store.commit('setStatus', 'valid')
+    store.commit('setSettings', this.formattingSettings)
   }, 500)
 
   public async destroy() {

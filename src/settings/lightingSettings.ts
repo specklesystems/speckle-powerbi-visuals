@@ -47,7 +47,7 @@ export class LightingSettings extends fs.Card {
       minValue: { type: ValidatorType.Min, value: 0.0 },
       maxValue: { type: ValidatorType.Max, value: 5.0 }
     },
-    value: DefaultLightConfiguration.indirectLightIntensity
+    value: DefaultLightConfiguration.indirectLightIntensity - 0.1
   })
 
   public shadows = new fs.ToggleSwitch({
@@ -79,7 +79,8 @@ export class LightingSettings extends fs.Card {
       intensity: this.intensity.value,
       elevation: this.elevation.value,
       azimuth: this.azimuth.value,
-      indirectLightIntensity: this.intensity.value
+      indirectLightIntensity: this.intensity.value,
+      shadowcatcher: this.shadowCatcher.value
     }
   }
 }

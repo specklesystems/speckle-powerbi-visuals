@@ -183,7 +183,6 @@ export default class ViewerHandler {
       color: string
     }[]
   ) {
-    //@ts-ignore
     this.state = await this.viewer.setUserObjectColors(groups ?? [])
   }
 

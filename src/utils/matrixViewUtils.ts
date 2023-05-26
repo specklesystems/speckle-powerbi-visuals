@@ -1,8 +1,11 @@
 import powerbi from 'powerbi-visuals-api'
 import { IViewerTooltip, IViewerTooltipData, SpeckleDataInput } from '../types'
+import { formattingSettings as fs } from 'powerbi-visuals-utils-formattingmodel'
+import {
+  createDataViewWildcardSelector,
+  DataViewWildcardMatchingOption
+} from 'powerbi-visuals-utils-dataviewutils/lib/dataViewWildcard'
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
-import { hasRole } from 'powerbi-visuals-utils-dataviewutils/lib/dataRoleHelper'
-import { LOD } from 'three'
 
 export function validateMatrixView(options: VisualUpdateOptions): {
   hasColorFilter: boolean
@@ -70,18 +73,34 @@ function processObjectNode(
   objectIdChild: powerbi.DataViewMatrixNode,
   host: powerbi.extensibility.visual.IVisualHost,
   matrixView: powerbi.DataViewMatrix
-) {
+): {
+  data: IViewerTooltipData[]
+  shouldColor: boolean
+  shouldSelect: boolean
+  id: string
+  selectionId: powerbi.visuals.ISelectionId
+  color?: string
+} {
   const objId = objectIdChild.value as string
   // Create selection IDs for each object
   const nodeSelection = host
     .createSelectionIdBuilder()
     .withMatrixNode(objectIdChild, matrixView.rows.levels)
     .createSelectionId()
-
   // Create value records for the tooltips
-  var objectValues = processObjectValues(objectIdChild, matrixView)
-
-  return { id: objId, selectionId: nodeSelection, ...objectValues }
+  const objectValues = processObjectValues(objectIdChild, matrixView)
+  const res = { id: objId, selectionId: nodeSelection, color: undefined, ...objectValues }
+  // Process node objects, if any.
+  if (objectIdChild.objects) {
+    //@ts-ignore
+    const color = objectIdChild.objects.color.fill.solid.color as string
+    console.log('⚠️ HAS objects', color)
+    if (color) {
+      res.color = color
+      res.shouldColor = true
+    }
+  }
+  return res
 }
 
 function processObjectIdLevel(
@@ -94,7 +113,7 @@ function processObjectIdLevel(
   )
 }
 
-var previousPalette = null
+//var previousPalette = null
 export function processMatrixView(
   matrixView: powerbi.DataViewMatrix,
   host: powerbi.extensibility.visual.IVisualHost,
@@ -114,29 +133,61 @@ export function processMatrixView(
       objectUrlsToLoad.push(`${url}/objects/${parentId}`)
 
       if (!hasColorFilter) {
-        console.log('🖌️❌ NO COLOR FILTER')
         processObjectIdLevel(parentObjectIdChild, host, matrixView).forEach((objRes) => {
           objectIds.push(objRes.id)
           onSelectionPair(objRes.id, objRes.selectionId)
           if (objRes.shouldSelect) selectedIds.push(objRes.id)
+          if (objRes.color) {
+            let group = colorByIds.find((g) => g.color === objRes.color)
+            if (!group) {
+              group = {
+                color: objRes.color,
+                objectIds: []
+              }
+              colorByIds.push(group)
+            }
+            group.objectIds.push(objRes.id)
+          }
           objectTooltipData.set(objRes.id, {
             selectionId: objRes.selectionId,
             data: objRes.data
           })
         })
       } else {
-        console.log('🖌️✅ HAS COLOR FILTER')
-        if (previousPalette) host.colorPalette['colorPalette'] = previousPalette
+        //if (previousPalette) host.colorPalette['colorPalette'] = previousPalette
         parentObjectIdChild.children?.forEach((colorByChild) => {
+          const colorSelectionId = host
+            .createSelectionIdBuilder()
+            .withMatrixNode(colorByChild, matrixView.rows.levels)
+            .createSelectionId()
+
           const color = host.colorPalette.getColor(colorByChild.value as string)
+          if (colorByChild.objects) {
+            console.log(
+              '⚠️COLOR NODE HAS objects',
+              colorByChild.objects,
+              colorByChild.objects.color?.fill
+            )
+          }
+
+          const colorSlice = new fs.ColorPicker({
+            name: 'selectorFill',
+            displayName: colorByChild.value.toString(),
+            value: {
+              value: color.value
+            },
+            selector: colorSelectionId.getSelector()
+          })
+
           const colorGroup = {
             color: color.value,
+            slice: colorSlice,
             objectIds: []
           }
+
           processObjectIdLevel(colorByChild, host, matrixView).forEach((objRes) => {
             objectIds.push(objRes.id)
             onSelectionPair(objRes.id, objRes.selectionId)
-
             if (objRes.shouldSelect) selectedIds.push(objRes.id)
             if (objRes.shouldColor) {
               colorGroup.objectIds.push(objRes.id)
@@ -152,7 +203,7 @@ export function processMatrixView(
     })
   })
 
-  previousPalette = host.colorPalette['colorPalette']
+  //previousPalette = host.colorPalette['colorPalette']
 
   return {
     objectsToLoad: objectUrlsToLoad,

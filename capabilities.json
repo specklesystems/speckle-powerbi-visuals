@@ -129,7 +129,7 @@
     },
     "color": {
       "properties": {
-        "start": {
+        "fill": {
           "type": {
             "fill": {
               "solid": {
@@ -138,25 +138,7 @@
             }
           }
         },
-        "mid": {
-          "type": {
-            "fill": {
-              "solid": {
-                "color": true
-              }
-            }
-          }
-        },
-        "end": {
-          "type": {
-            "fill": {
-              "solid": {
-                "color": true
-              }
-            }
-          }
-        },
-        "background": {
+        "selectorFill": {
           "type": {
             "fill": {
               "solid": {

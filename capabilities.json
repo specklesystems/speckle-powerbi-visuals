@@ -74,7 +74,6 @@
     "camera": {
       "properties": {
         "defaultView": {
-          "displayName": "Default view",
           "type": {
             "enumeration": [
               {
@@ -110,8 +109,17 @@
             ]
           }
         },
+        "allowCameraUnder": {
+          "type": {
+            "bool": true
+          }
+        },
+        "zoomOnDataChange": {
+          "type": {
+            "bool": true
+          }
+        },
         "projection": {
-          "displayName": "Projection",
           "type": {
             "enumeration": [
               {
@@ -129,6 +137,11 @@
     },
     "color": {
       "properties": {
+        "enabled": {
+          "type": {
+            "bool": true
+          }
+        },
         "fill": {
           "type": {
             "fill": {

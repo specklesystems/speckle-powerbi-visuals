@@ -4,8 +4,16 @@ import {
   DataViewWildcardMatchingOption
 } from 'powerbi-visuals-utils-dataviewutils/lib/dataViewWildcard'
 import VisualEnumerationInstanceKinds = powerbi.VisualEnumerationInstanceKinds
+import { DefaultLightConfiguration } from '@speckle/viewer'
 
 export class ColorSettings extends fs.Card {
+  public enabled = new fs.ToggleSwitch({
+    name: 'enabled',
+    displayName: 'Enabled',
+    value: true,
+    topLevelToggle: true
+  })
+
   public fill = new fs.ColorPicker({
     name: 'fill',
     displayName: 'Advanced controls',
@@ -20,7 +28,7 @@ export class ColorSettings extends fs.Card {
 
   name = 'color'
   displayName = 'Color'
-  slices: fs.Slice[] = [this.fill]
+  slices: fs.Slice[] = [this.enabled, this.fill]
 }
 
 export class ColorSelectorSettings extends fs.Card {

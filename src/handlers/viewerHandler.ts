@@ -22,14 +22,14 @@ export default class ViewerHandler {
     batchSize: 25
   }
   private currentSectionBox: Box3 = null
+  private currentSettings: SpeckleVisualSettingsModel
 
   public getViews() {
     return this.viewer.getViews()
   }
 
-  private previousLightConfig = DefaultLightConfiguration
-
   public updateSettings(settings: SpeckleVisualSettingsModel) {
+    // Camera settings
     switch (settings.camera.projection.value) {
       case 'perspective':
         this.viewer.setPerspectiveCameraOn()
@@ -38,12 +38,18 @@ export default class ViewerHandler {
         this.viewer.setOrthoCameraOn()
         break
     }
-    var newConfig = settings.lighting.getViewerConfiguration()
-    if (!_.isEqual(this.previousLightConfig, newConfig)) {
-      this.viewer.setLightConfiguration(newConfig)
-      this.previousLightConfig = newConfig
-    }
+
+    this.viewer.cameraHandler.controls.maxPolarAngle = settings.camera.allowCameraUnder.value
+      ? Math.PI
+      : Math.PI / 2
+
+    // Lighting settings
+    const newConfig = settings.lighting.getViewerConfiguration()
+    this.viewer.setLightConfiguration(newConfig)
+
+    this.currentSettings = settings
   }
+
   public setView(view: SpeckleView | CanonicalView) {
     this.viewer.setView(view)
   }
@@ -110,6 +116,7 @@ export default class ViewerHandler {
     await this.unloadObjects(objectsToUnload, signal)
     await this.loadObjects(objectUrls, onLoad, onError, signal)
   }
+
   public async loadObjects(
     objectUrls: string[],
     onLoad: (url: string, index: number) => void,
@@ -167,7 +174,13 @@ export default class ViewerHandler {
       objects: res.objects
     }
   }
+  public zoom(objectIds?: string[]) {
+    this.viewer.zoom(objectIds)
+  }
 
+  public zoomExtents() {
+    this.viewer.zoom()
+  }
   public async unIsolateObjects() {
     if (this.state.isolatedObjects)
       this.state = await this.viewer.unIsolateObjects(this.state.isolatedObjects, 'powerbi', true)

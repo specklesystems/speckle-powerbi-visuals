@@ -113,7 +113,7 @@ function processObjectIdLevel(
   )
 }
 
-//var previousPalette = null
+let previousPalette = null
 export function processMatrixView(
   matrixView: powerbi.DataViewMatrix,
   host: powerbi.extensibility.visual.IVisualHost,
@@ -154,7 +154,7 @@ export function processMatrixView(
           })
         })
       } else {
-        //if (previousPalette) host.colorPalette['colorPalette'] = previousPalette
+        if (previousPalette) host.colorPalette['colorPalette'] = previousPalette
         parentObjectIdChild.children?.forEach((colorByChild) => {
           const colorSelectionId = host
             .createSelectionIdBuilder()
@@ -203,7 +203,7 @@ export function processMatrixView(
     })
   })
 
-  //previousPalette = host.colorPalette['colorPalette']
+  previousPalette = host.colorPalette['colorPalette']
 
   return {
     objectsToLoad: objectUrlsToLoad,

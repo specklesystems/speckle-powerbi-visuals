@@ -1,6 +1,6 @@
 import { formattingSettings as fs } from 'powerbi-visuals-utils-formattingmodel'
 import ValidatorType = powerbi.visuals.ValidatorType
-import { DefaultLightConfiguration, SunLightConfiguration } from '@speckle/viewer'
+import { SunLightConfiguration } from '@speckle/viewer'
 
 export class LightingSettings extends fs.Card {
   name = 'lighting'
@@ -9,7 +9,7 @@ export class LightingSettings extends fs.Card {
   public enabled = new fs.ToggleSwitch({
     name: 'enabled',
     displayName: 'Enabled',
-    value: DefaultLightConfiguration.enabled,
+    value: true,
     topLevelToggle: true
   })
 
@@ -20,7 +20,7 @@ export class LightingSettings extends fs.Card {
       minValue: { type: ValidatorType.Min, value: 1 },
       maxValue: { type: ValidatorType.Max, value: 10 }
     },
-    value: DefaultLightConfiguration.intensity
+    value: 5
   })
   public elevation = new fs.Slider({
     name: 'elevation',
@@ -29,7 +29,7 @@ export class LightingSettings extends fs.Card {
       minValue: { type: ValidatorType.Min, value: 0 },
       maxValue: { type: ValidatorType.Max, value: Math.PI }
     },
-    value: DefaultLightConfiguration.elevation
+    value: 1.33
   })
   public azimuth = new fs.Slider({
     name: 'azimuth',
@@ -38,7 +38,7 @@ export class LightingSettings extends fs.Card {
       minValue: { type: ValidatorType.Min, value: -Math.PI * 0.5 },
       maxValue: { type: ValidatorType.Max, value: Math.PI * 0.5 }
     },
-    value: DefaultLightConfiguration.azimuth
+    value: 0.75
   })
   public indirect = new fs.Slider({
     name: 'indirect',
@@ -47,19 +47,19 @@ export class LightingSettings extends fs.Card {
       minValue: { type: ValidatorType.Min, value: 0.0 },
       maxValue: { type: ValidatorType.Max, value: 5.0 }
     },
-    value: DefaultLightConfiguration.indirectLightIntensity - 0.1
+    value: 1.2
   })
 
   public shadows = new fs.ToggleSwitch({
     name: 'shadows',
     displayName: 'Cast shadows',
-    value: DefaultLightConfiguration.castShadow
+    value: true
   })
 
   public shadowCatcher = new fs.ToggleSwitch({
     name: 'shadowCatcher',
     displayName: 'Catch Shadows',
-    value: DefaultLightConfiguration.shadowcatcher
+    value: true
   })
 
   slices: fs.Slice[] = [

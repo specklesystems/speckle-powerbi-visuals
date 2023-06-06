@@ -127,7 +127,8 @@ const config: WebpackConfiguration = {
     alias: {
       src: path.resolve(__dirname, 'src/'),
       assets: path.resolve(__dirname, 'assets/')
-    }
+    },
+    plugins: [new TsconfigPathsPlugin()]
   },
   output: {
     publicPath: '/assets',
@@ -164,8 +165,11 @@ const config: WebpackConfiguration = {
           realWindow: "Function('return this')()"
         },
   plugins: [
+    new webpack.DefinePlugin({
+      __VUE_OPTIONS_API__: JSON.stringify(true),
+      __VUE_PROD_DEVTOOLS__: JSON.stringify(false)
+    }),
     new VueLoaderPlugin(),
-    new TsconfigPathsPlugin(),
     new MiniCssExtractPlugin({
       filename: 'visual.css',
       chunkFilename: '[id].css'

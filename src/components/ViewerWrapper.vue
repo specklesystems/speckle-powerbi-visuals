@@ -1,13 +1,28 @@
 <script async setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, Ref, ref, watch, watchEffect } from 'vue'
+import {
+  computed,
+  inject,
+  onBeforeUnmount,
+  onMounted,
+  provide,
+  Ref,
+  ref,
+  watch,
+  watchEffect
+} from 'vue'
 import { useStore } from 'vuex'
 import ViewerControls from 'src/components/ViewerControls.vue'
-import { SpeckleView } from '@speckle/viewer'
+import { CanonicalView, SpeckleView } from '@speckle/viewer'
 import { CommonLoadingBar } from '@speckle/ui-components'
 import ViewerHandler from 'src/handlers/viewerHandler'
 import { useClickDragged } from 'src/composables/useClickDragged'
 import { isMultiSelect } from 'src/utils/isMultiSelect'
-import { selectionHandlerKey, storeKey, tooltipHandlerKey } from 'src/injectionKeys'
+import {
+  selectionHandlerKey,
+  storeKey,
+  tooltipHandlerKey,
+  viewerHandlerKey
+} from 'src/injectionKeys'
 import { SpeckleDataInput } from 'src/types'
 import { debounce, throttle } from 'lodash'
 
@@ -27,6 +42,7 @@ let setupTask: Promise<void> = null
 
 const isLoading = computed(() => updateTask.value != null)
 const input = computed(() => store.state.input)
+const settings = computed(() => store.state.settings)
 
 const onCameraMoved = throttle((_) => {
   const pos = tooltipHandler.currentTooltip?.worldPos
@@ -37,21 +53,25 @@ const onCameraMoved = throttle((_) => {
 
 onMounted(() => {
   viewerHandler = new ViewerHandler(container.value)
+  provide<ViewerHandler>(viewerHandlerKey, viewerHandler)
   setupTask = viewerHandler
     .init()
     .then(() => viewerHandler.addCameraUpdateEventListener(onCameraMoved))
-    .finally(() => {
-      if (input.value) cancelAndHandleDataUpdate()
+    .finally(async () => {
+      if (input.value) await cancelAndHandleDataUpdate()
+      viewerHandler.updateSettings(settings.value)
+      viewerHandler.setView(settings.value.camera.defaultView.value as CanonicalView)
     })
 })
 
 onBeforeUnmount(async () => {
   await viewerHandler.dispose()
-  viewerHandler = null
 })
 
-const debounceUpdate = debounce(cancelAndHandleDataUpdate, 500)
+const debounceUpdate = throttle(cancelAndHandleDataUpdate, 500)
+const debounceSettingsUpdate = throttle(() => viewerHandler.updateSettings(settings.value), 500)
 watch(input, debounceUpdate)
+watch(settings, debounceSettingsUpdate)
 
 watchEffect(() => {
   if (!isLoading.value) viewerHandler?.setSectionBox(bboxActive.value, input.value.objectIds)
@@ -71,17 +91,17 @@ function handleDataUpdate(input: Ref<SpeckleDataInput>, signal: AbortSignal) {
         console.error,
         signal
       )
-      signal.throwIfAborted()
+
       // Color
       await viewerHandler.colorObjectsByGroup(input.value.colorByIds)
 
       // Select
       await viewerHandler.unIsolateObjects()
-      if (input.value.selectedIds.length == 0)
-        await viewerHandler.isolateObjects(input.value.objectIds, true)
-      else await viewerHandler.isolateObjects(input.value.selectedIds, true)
+      const objectsToIsolate =
+        input.value.selectedIds.length == 0 ? input.value.objectIds : input.value.selectedIds
+      await viewerHandler.isolateObjects(objectsToIsolate, true)
+      if (settings.value.camera.zoomOnDataChange.value) viewerHandler.zoom(objectsToIsolate)
 
-      signal.throwIfAborted()
       // Update available views
       views.value = viewerHandler.getViews()
     })
@@ -96,9 +116,9 @@ function handleDataUpdate(input: Ref<SpeckleDataInput>, signal: AbortSignal) {
 async function cancelAndHandleDataUpdate() {
   console.log('Input has changed', input.value)
   if (updateTask.value) {
-    ac.abort()
+    ac.abort('New input is available')
     console.log('Cancelling previous load job')
-    await updateTask
+    await updateTask.value
     ac = new AbortController()
   }
   const signal = ac.signal

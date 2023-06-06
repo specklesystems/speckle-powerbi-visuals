@@ -1,51 +1,17 @@
-import { formattingSettings } from 'powerbi-visuals-utils-formattingmodel'
-import { SpeckleVisualSettings } from './'
+import { formattingSettings as fs } from 'powerbi-visuals-utils-formattingmodel'
+import { ColorSelectorSettings, ColorSettings } from 'src/settings/colorSettings'
+import { CameraSettings } from 'src/settings/cameraSettings'
+import { LightingSettings } from 'src/settings/lightingSettings'
 
-import FormattingSettingsCard = formattingSettings.Card
-import FormattingSettingsModel = formattingSettings.Model
-import FormattingSettingsSlice = formattingSettings.Slice
-
-export class SpeckleVisualSettingsModel extends FormattingSettingsModel {
+export class SpeckleVisualSettingsModel extends fs.Model {
   // Building my visual formatting settings card
-  colorsCard: SpeckleVisualColorSettingsCard = new SpeckleVisualColorSettingsCard()
+  public color: ColorSettings = new ColorSettings()
 
-  // Add formatting settings card to cards list in model
-  cards = [this.colorsCard]
-}
+  public colorSelector: ColorSelectorSettings = new ColorSelectorSettings()
 
-class SpeckleVisualColorSettingsCard extends FormattingSettingsCard {
-  public startColorSlice = new formattingSettings.ColorPicker({
-    name: 'startColor',
-    displayName: 'Start Color',
-    value: { value: '#ffffff' },
-    defaultColor: { value: '#ffffff' }
-  })
+  public camera: CameraSettings = new CameraSettings()
 
-  public midColorSlice = new formattingSettings.ColorPicker({
-    name: 'midColor',
-    displayName: 'Mid Color',
-    value: { value: SpeckleVisualSettings.current.color.midColor }
-  })
+  public lighting: LightingSettings = new LightingSettings()
 
-  public endColorSlice = new formattingSettings.ColorPicker({
-    name: 'endColor',
-    displayName: 'End Color',
-    value: { value: SpeckleVisualSettings.current.color.endColor }
-  })
-
-  public backgroundColorSlice = new formattingSettings.ColorPicker({
-    name: 'backgroundColor',
-    displayName: 'Background Color',
-    value: { value: SpeckleVisualSettings.current.color.background }
-  })
-
-  name = 'speckleVisual_colors'
-  displayName = 'Colors'
-  analyticsPane = false
-  slices: Array<FormattingSettingsSlice> = [
-    this.startColorSlice,
-    this.midColorSlice,
-    this.endColorSlice,
-    this.backgroundColorSlice
-  ]
+  cards = [this.color, this.camera, this.lighting]
 }

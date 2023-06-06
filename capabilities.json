@@ -72,10 +72,8 @@
   ],
   "objects": {
     "camera": {
-      "displayName": "Camera",
       "properties": {
         "defaultView": {
-          "displayName": "Default view",
           "type": {
             "enumeration": [
               {
@@ -111,19 +109,40 @@
             ]
           }
         },
-        "orthoMode": {
-          "displayName": "Ortho mode",
+        "allowCameraUnder": {
           "type": {
             "bool": true
+          }
+        },
+        "zoomOnDataChange": {
+          "type": {
+            "bool": true
+          }
+        },
+        "projection": {
+          "type": {
+            "enumeration": [
+              {
+                "displayName": "Perspective",
+                "value": "perspective"
+              },
+              {
+                "displayName": "Orthographic",
+                "value": "orthographic"
+              }
+            ]
           }
         }
       }
     },
     "color": {
-      "displayName": "Color",
       "properties": {
-        "background": {
-          "displayName": "Background Color",
+        "enabled": {
+          "type": {
+            "bool": true
+          }
+        },
+        "fill": {
           "type": {
             "fill": {
               "solid": {
@@ -132,8 +151,7 @@
             }
           }
         },
-        "endColor": {
-          "displayName": "End Color",
+        "selectorFill": {
           "type": {
             "fill": {
               "solid": {
@@ -141,25 +159,44 @@
               }
             }
           }
-        },
-        "midColor": {
-          "displayName": "Middle Color",
+        }
+      }
+    },
+    "lighting": {
+      "properties": {
+        "enabled": {
           "type": {
-            "fill": {
-              "solid": {
-                "color": true
-              }
-            }
+            "bool": true
           }
         },
-        "startColor": {
-          "displayName": "Start Color",
+        "intensity": {
           "type": {
-            "fill": {
-              "solid": {
-                "color": true
-              }
-            }
+            "numeric": true
+          }
+        },
+        "elevation": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "azimuth": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "indirect": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "shadows": {
+          "type": {
+            "bool": true
+          }
+        },
+        "shadowCatcher": {
+          "type": {
+            "bool": true
           }
         }
       }
@@ -181,6 +218,11 @@
     {
       "essential": false,
       "name": "ExportContent"
+    },
+    {
+      "essential": true,
+      "name": "LocalStorage",
+      "parameters": []
     }
   ],
   "sorting": {

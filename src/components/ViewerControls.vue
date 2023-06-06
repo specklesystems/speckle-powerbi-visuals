@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { VideoCameraIcon, CubeIcon } from '@heroicons/vue/24/solid'
+import { VideoCameraIcon, CubeIcon, ArrowsPointingOutIcon } from '@heroicons/vue/24/solid'
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import { CanonicalView, SpeckleView } from '@speckle/viewer'
 import ButtonToggle from 'src/components/controls/ButtonToggle.vue'
 import ButtonGroup from 'src/components/controls/ButtonGroup.vue'
+import ButtonSimple from 'src/components/controls/ButtonSimple.vue'
+import { inject, watch } from 'vue'
+import { viewerHandlerKey } from 'src/injectionKeys'
 
 const emits = defineEmits(['update:sectionBox', 'view-clicked'])
 const props = withDefaults(defineProps<{ sectionBox: boolean; views: SpeckleView[] }>(), {
   sectionBox: false,
   views: () => []
 })
-
+const viewerHandler = inject(viewerHandlerKey)
 const canonicalViews = [
   { name: 'Top' },
   { name: 'Front' },
@@ -18,10 +21,18 @@ const canonicalViews = [
   { name: 'Back' },
   { name: 'Right' }
 ]
+
+const onZoomExtentsClicked = (ev: MouseEvent) => {
+  console.log('Zoom extents clicked', viewerHandler)
+  viewerHandler.zoomExtents()
+}
 </script>
 
 <template>
   <ButtonGroup>
+    <ButtonSimple flat secondary @click="onZoomExtentsClicked">
+      <ArrowsPointingOutIcon class="h-5 w-5" />
+    </ButtonSimple>
     <Menu as="div" class="relative z-30">
       <MenuButton v-slot="{ open }" as="template">
         <ButtonToggle flat secondary :active="open">

@@ -1,5 +1,17 @@
 <script setup lang="ts">
 import { FormButton } from '@speckle/ui-components'
+import { inject } from 'vue'
+import { hostKey } from 'src/injectionKeys'
+
+const host = inject(hostKey)
+
+function goToForum() {
+  host.launchUrl('https://speckle.community/tag/powerbi')
+}
+
+function goToGuide() {
+  host.launchUrl('https://speckle.guide/user/powerbi')
+}
 </script>
 
 <template>
@@ -8,13 +20,12 @@ import { FormButton } from '@speckle/ui-components'
     class="flex flex-col justify-center items-center h-full w-full bg-primary text-center text-foundation"
   >
     <div class="flex justify-center items-center">
-      <img src="../../assets/logo-white.png" alt="Logo" class="w-1/2" />
+      <img src="../../assets/logo-white.png" alt="Logo" class="w-1/3" />
     </div>
     <p class="heading">Speckle PowerBI 3D Visual</p>
-    <p class="">Some subtext here...</p>
-    <div class="flex justify-center gap-2">
-      <FormButton color="invert">Help</FormButton>
-      <FormButton color="invert">Getting started</FormButton>
+    <div class="flex justify-center mt-2 gap-1">
+      <FormButton color="invert" @click="goToForum">Help</FormButton>
+      <FormButton color="invert" @click="goToGuide">Getting started</FormButton>
     </div>
   </div>
 </template>

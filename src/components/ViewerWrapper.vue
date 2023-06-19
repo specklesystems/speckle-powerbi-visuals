@@ -25,6 +25,7 @@ import {
 } from 'src/injectionKeys'
 import { SpeckleDataInput } from 'src/types'
 import { debounce, throttle } from 'lodash'
+import { ContextOption } from 'src/settings/colorSettings'
 
 const selectionHandler = inject(selectionHandlerKey)
 const tooltipHandler = inject(tooltipHandlerKey)
@@ -60,7 +61,6 @@ onMounted(() => {
     .finally(async () => {
       if (input.value) await cancelAndHandleDataUpdate()
       viewerHandler.updateSettings(settings.value)
-      viewerHandler.setView(settings.value.camera.defaultView.value as CanonicalView)
     })
 })
 
@@ -95,11 +95,14 @@ function handleDataUpdate(input: Ref<SpeckleDataInput>, signal: AbortSignal) {
       // Color
       await viewerHandler.colorObjectsByGroup(input.value.colorByIds)
 
-      // Select
       await viewerHandler.unIsolateObjects()
       const objectsToIsolate =
         input.value.selectedIds.length == 0 ? input.value.objectIds : input.value.selectedIds
-      await viewerHandler.isolateObjects(objectsToIsolate, true)
+      if (settings.value.color.context.value != ContextOption.show)
+        await viewerHandler.isolateObjects(
+          objectsToIsolate,
+          settings.value.color.context.value === ContextOption.ghosted
+        )
       if (settings.value.camera.zoomOnDataChange.value) viewerHandler.zoom(objectsToIsolate)
 
       // Update available views
@@ -151,6 +154,10 @@ async function onCanvasAuxClick(ev: MouseEvent) {
   const intersectResult = await viewerHandler.intersect({ x: ev.clientX, y: ev.clientY })
   await selectionHandler.showContextMenu(ev, intersectResult?.hit)
 }
+
+function onClearPalette() {
+  cancelAndHandleDataUpdate()
+}
 </script>
 
 <template>
@@ -170,6 +177,7 @@ async function onCanvasAuxClick(ev: MouseEvent) {
       :views="views"
       class="fixed bottom-6"
       @view-clicked="(view) => viewerHandler.setView(view)"
+      @clearPalette="onClearPalette"
     />
   </div>
 </template>

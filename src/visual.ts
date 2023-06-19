@@ -76,7 +76,7 @@ export class Visual implements IVisual {
       console.log('❌Input not valid:', (e as Error).message)
       this.host.displayWarningIcon(
         `Incomplete data input.`,
-        `"Stream URL" and "Object ID" data inputs are mandatory`
+        `"Stream URL", "Commit Object ID" and "Object ID" data inputs are mandatory. If your data connector does not output all these columns, please update it.`
       )
       console.warn(`Incomplete data input. "Stream URL" and "Object ID" data inputs are mandatory`)
       store.commit('setStatus', 'incomplete')
@@ -96,6 +96,7 @@ export class Visual implements IVisual {
             validationResult.view,
             this.host,
             validationResult.hasColorFilter,
+            this.formattingSettings,
             (obj, id) => this.selectionHandler.set(obj, id)
           )
           this.throttleUpdate(input)

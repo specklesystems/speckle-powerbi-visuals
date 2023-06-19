@@ -5,13 +5,11 @@ import {
   IntersectionQuery,
   DefaultViewerParams,
   Box3,
-  SpeckleView,
-  DefaultLightConfiguration
+  SpeckleView
 } from '@speckle/viewer'
 import { pickViewableHit, projectToScreen } from '../utils/viewerUtils'
 import _ from 'lodash'
 import { SpeckleVisualSettingsModel } from 'src/settings/visualSettingsModel'
-
 export default class ViewerHandler {
   private viewer: Viewer
   private readonly parent: HTMLElement

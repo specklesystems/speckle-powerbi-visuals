@@ -78,32 +78,26 @@
             "enumeration": [
               {
                 "displayName": "Perspective",
-                "displayNameKey": "perspective",
                 "value": "perspective"
               },
               {
                 "displayName": "Top",
-                "displayNameKey": "top",
                 "value": "top"
               },
               {
                 "displayName": "Front",
-                "displayNameKey": "front",
                 "value": "front"
               },
               {
                 "displayName": "Left",
-                "displayNameKey": "left",
                 "value": "left"
               },
               {
                 "displayName": "Back",
-                "displayNameKey": "back",
                 "value": "back"
               },
               {
                 "displayName": "Right",
-                "displayNameKey": "right",
                 "value": "right"
               }
             ]
@@ -151,13 +145,18 @@
             }
           }
         },
-        "selectorFill": {
+        "context": {
           "type": {
-            "fill": {
-              "solid": {
-                "color": true
+            "enumeration": [
+              {
+                "displayName": "Hidden",
+                "value": "hidden"
+              },
+              {
+                "displayName": "Ghosted",
+                "value": "ghosted"
               }
-            }
+            ]
           }
         }
       }
@@ -232,6 +231,7 @@
   "supportsHighlight": true,
   "supportsKeyboardFocus": true,
   "supportsLandingPage": true,
+  "keepAllMetadataColumns": true,
   "supportsMultiVisualSelection": true,
   "supportsSynchronizingFilterState": true,
   "suppressDefaultTitle": true,

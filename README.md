@@ -4,6 +4,7 @@
 </h1>
 <h3 align="center">
     3D Viewer for PowerBI and more...
+    Expected use case is that the visual displays data pulled from Speckle via the Speckle Data Connector for PowerBI (https://github.com/specklesystems/speckle-powerbi)
 </h3>
 
 > ⚠️ This repo is still in very early stages of development, use at your own risk!

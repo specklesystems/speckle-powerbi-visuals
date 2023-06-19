@@ -63,7 +63,6 @@ export class LightingSettings extends fs.Card {
   })
 
   slices: fs.Slice[] = [
-    this.enabled,
     this.intensity,
     this.elevation,
     this.azimuth,

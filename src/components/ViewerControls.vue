@@ -1,14 +1,20 @@
 <script setup lang="ts">
-import { VideoCameraIcon, CubeIcon, ArrowsPointingOutIcon } from '@heroicons/vue/24/solid'
+import {
+  VideoCameraIcon,
+  CubeIcon,
+  ArrowsPointingOutIcon,
+  PaintBrushIcon
+} from '@heroicons/vue/24/solid'
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import { CanonicalView, SpeckleView } from '@speckle/viewer'
 import ButtonToggle from 'src/components/controls/ButtonToggle.vue'
 import ButtonGroup from 'src/components/controls/ButtonGroup.vue'
 import ButtonSimple from 'src/components/controls/ButtonSimple.vue'
 import { inject, watch } from 'vue'
-import { viewerHandlerKey } from 'src/injectionKeys'
+import { hostKey, viewerHandlerKey } from 'src/injectionKeys'
+import { resetPalette } from 'src/utils/matrixViewUtils'
 
-const emits = defineEmits(['update:sectionBox', 'view-clicked'])
+const emits = defineEmits(['update:sectionBox', 'view-clicked', 'clear-palette'])
 const props = withDefaults(defineProps<{ sectionBox: boolean; views: SpeckleView[] }>(), {
   sectionBox: false,
   views: () => []
@@ -25,6 +31,12 @@ const canonicalViews = [
 const onZoomExtentsClicked = (ev: MouseEvent) => {
   console.log('Zoom extents clicked', viewerHandler)
   viewerHandler.zoomExtents()
+}
+const host = inject(hostKey)
+const onClearPalletteClicked = (ev: MouseEvent) => {
+  console.log('Clear pallette clicked')
+  resetPalette()
+  emits('clear-palette')
 }
 </script>
 
@@ -90,6 +102,9 @@ const onZoomExtentsClicked = (ev: MouseEvent) => {
     >
       <CubeIcon class="h-5 w-5" />
     </ButtonToggle>
+    <ButtonSimple flat secondary @click="onClearPalletteClicked">
+      <PaintBrushIcon class="h-5 w-5" />
+    </ButtonSimple>
   </ButtonGroup>
 </template>
 

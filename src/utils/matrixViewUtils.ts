@@ -6,6 +6,7 @@ import {
   DataViewWildcardMatchingOption
 } from 'powerbi-visuals-utils-dataviewutils/lib/dataViewWildcard'
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions
+import { SpeckleVisualSettingsModel } from 'src/settings/visualSettingsModel'
 
 export function validateMatrixView(options: VisualUpdateOptions): {
   hasColorFilter: boolean
@@ -113,11 +114,16 @@ function processObjectIdLevel(
   )
 }
 
-let previousPalette = null
+export let previousPalette = null
+
+export function resetPalette() {
+  previousPalette = null
+}
 export function processMatrixView(
   matrixView: powerbi.DataViewMatrix,
   host: powerbi.extensibility.visual.IVisualHost,
   hasColorFilter: boolean,
+  settings: SpeckleVisualSettingsModel,
   onSelectionPair: (objId: string, selectionId: powerbi.extensibility.ISelectionId) => void
 ): SpeckleDataInput {
   const objectUrlsToLoad = [],
@@ -125,6 +131,7 @@ export function processMatrixView(
     selectedIds = [],
     colorByIds = [],
     objectTooltipData = new Map<string, IViewerTooltip>()
+
   matrixView.rows.root.children.forEach((streamUrlChild) => {
     const url = streamUrlChild.value
 

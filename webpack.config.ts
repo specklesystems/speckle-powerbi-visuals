@@ -6,7 +6,7 @@ import powerbi from 'powerbi-visuals-api'
 import ExtraWatchWebpackPlugin from 'extra-watch-webpack-plugin'
 import { BundleAnalyzerPlugin as Visualizer } from 'webpack-bundle-analyzer'
 import MiniCssExtractPlugin from 'mini-css-extract-plugin'
-import PowerBICustomVisualsWebpackPlugin from 'powerbi-visuals-webpack-plugin'
+import { PowerBICustomVisualsWebpackPlugin } from 'powerbi-visuals-webpack-plugin'
 import webpack from 'webpack'
 import fs from 'fs'
 import { WebpackConfiguration } from 'webpack-cli'
@@ -37,6 +37,9 @@ const babelOptions = {
     [
       '@babel/preset-env',
       {
+        targets: {
+          ie: '11'
+        },
         useBuiltIns: 'entry',
         corejs: 3,
         modules: false
@@ -57,7 +60,7 @@ const config: WebpackConfiguration = {
     minimize: true // enable minimization for create *.pbiviz file less than 2 Mb, can be disabled for dev mode
   },
   devtool: 'source-map',
-  mode: 'development',
+  mode: 'production',
   module: {
     rules: [
       {

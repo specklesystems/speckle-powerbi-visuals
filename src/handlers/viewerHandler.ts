@@ -8,28 +8,48 @@ import {
   SpeckleView
 } from '@speckle/viewer'
 import { pickViewableHit, projectToScreen } from '../utils/viewerUtils'
-import { SpeckleVisualSettings } from '../settings'
-import { SettingsChangedType, Tracker } from '../utils/mixpanel'
 import _ from 'lodash'
-
+import { SpeckleVisualSettingsModel } from 'src/settings/visualSettingsModel'
 export default class ViewerHandler {
   private viewer: Viewer
   private readonly parent: HTMLElement
   private state: FilteringState
   private loadedObjectsCache: Set<string> = new Set<string>()
-  private settings = {
+  private config = {
     authToken: null,
     batchSize: 25
   }
   private currentSectionBox: Box3 = null
+  private currentSettings: SpeckleVisualSettingsModel
 
   public getViews() {
     return this.viewer.getViews()
   }
 
+  public updateSettings(settings: SpeckleVisualSettingsModel) {
+    // Camera settings
+    switch (settings.camera.projection.value) {
+      case 'perspective':
+        this.viewer.setPerspectiveCameraOn()
+        break
+      case 'orthographic':
+        this.viewer.setOrthoCameraOn()
+        break
+    }
+
+    this.viewer.cameraHandler.controls.maxPolarAngle = settings.camera.allowCameraUnder.value
+      ? Math.PI
+      : Math.PI / 2
+
+    // Lighting settings
+    const newConfig = settings.lighting.getViewerConfiguration()
+    this.viewer.setLightConfiguration(newConfig)
+
+    this.currentSettings = settings
+  }
+
   public setView(view: SpeckleView | CanonicalView) {
     this.viewer.setView(view)
-    if (typeof view === 'string') this.viewer.zoom([...this.loadedObjectsCache], 10, false)
   }
 
   public setSectionBox(active: boolean, objectIds: string[]) {
@@ -52,25 +72,9 @@ export default class ViewerHandler {
   public addCameraUpdateEventListener(listener: (ev) => void) {
     this.viewer.cameraHandler.controls.addEventListener('update', listener)
   }
-  public removeCameraUpdateEventListener(listener: (ev) => void) {
-    this.viewer.cameraHandler.controls.removeEventListener('update', listener)
-  }
 
   public constructor(parent: HTMLElement) {
     this.parent = parent
-  }
-
-  public changeSettings(oldSettings: SpeckleVisualSettings, newSettings: SpeckleVisualSettings) {
-    if (oldSettings.camera.orthoMode != newSettings.camera.orthoMode) {
-      Tracker.settingsChanged(SettingsChangedType.OrthoMode)
-      if (newSettings.camera.orthoMode) this.viewer.cameraHandler?.setOrthoCameraOn()
-      else this.viewer.cameraHandler?.setPerspectiveCameraOn()
-    }
-
-    if (oldSettings.camera.defaultView != newSettings.camera.defaultView) {
-      Tracker.settingsChanged(SettingsChangedType.DefaultCamera)
-      this.viewer.setView(newSettings.camera.defaultView as CanonicalView)
-    }
   }
 
   public async init() {
@@ -110,6 +114,7 @@ export default class ViewerHandler {
     await this.unloadObjects(objectsToUnload, signal)
     await this.loadObjects(objectUrls, onLoad, onError, signal)
   }
+
   public async loadObjects(
     objectUrls: string[],
     onLoad: (url: string, index: number) => void,
@@ -120,19 +125,19 @@ export default class ViewerHandler {
       let index = 0
       let promises = []
       for (const url of objectUrls) {
-        if (signal?.aborted) return
+        signal.throwIfAborted()
         console.log('Attempting to load', url)
         if (!this.loadedObjectsCache.has(url)) {
           console.log('Object is not in cache')
           const promise = this.viewer
-            .loadObjectAsync(url, this.settings.authToken, false)
+            .loadObjectAsync(url, this.config.authToken, false)
             .then(() => onLoad(url, index++))
             .catch((e: Error) => onError(url, e))
             .finally(() => {
               if (!this.loadedObjectsCache.has(url)) this.loadedObjectsCache.add(url)
             })
           promises.push(promise)
-          if (promises.length == this.settings.batchSize) {
+          if (promises.length == this.config.batchSize) {
             //this.promises.push(Promise.resolve(this.later(1000)))
             await Promise.all(promises)
             promises = []
@@ -143,6 +148,7 @@ export default class ViewerHandler {
       }
       await Promise.all(promises)
     } catch (error) {
+      if (error.name === 'AbortError') return
       throw new Error(`Load objects failed: ${error}`)
     }
   }
@@ -166,7 +172,13 @@ export default class ViewerHandler {
       objects: res.objects
     }
   }
+  public zoom(objectIds?: string[]) {
+    this.viewer.zoom(objectIds)
+  }
 
+  public zoomExtents() {
+    this.viewer.zoom()
+  }
   public async unIsolateObjects() {
     if (this.state.isolatedObjects)
       this.state = await this.viewer.unIsolateObjects(this.state.isolatedObjects, 'powerbi', true)
@@ -182,7 +194,6 @@ export default class ViewerHandler {
       color: string
     }[]
   ) {
-    //@ts-ignore
     this.state = await this.viewer.setUserObjectColors(groups ?? [])
   }
 

@@ -6,7 +6,7 @@ import powerbi from 'powerbi-visuals-api'
 import ExtraWatchWebpackPlugin from 'extra-watch-webpack-plugin'
 import { BundleAnalyzerPlugin as Visualizer } from 'webpack-bundle-analyzer'
 import MiniCssExtractPlugin from 'mini-css-extract-plugin'
-import PowerBICustomVisualsWebpackPlugin from 'powerbi-visuals-webpack-plugin'
+import { PowerBICustomVisualsWebpackPlugin } from 'powerbi-visuals-webpack-plugin'
 import webpack from 'webpack'
 import fs from 'fs'
 import { WebpackConfiguration } from 'webpack-cli'
@@ -37,6 +37,9 @@ const babelOptions = {
     [
       '@babel/preset-env',
       {
+        targets: {
+          ie: '11'
+        },
         useBuiltIns: 'entry',
         corejs: 3,
         modules: false
@@ -62,11 +65,7 @@ const config: WebpackConfiguration = {
     rules: [
       {
         test: /\.vue$/,
-        use: [
-          {
-            loader: 'vue-loader'
-          }
-        ]
+        use: ['vue-loader']
       },
       {
         parser: {
@@ -127,7 +126,8 @@ const config: WebpackConfiguration = {
     alias: {
       src: path.resolve(__dirname, 'src/'),
       assets: path.resolve(__dirname, 'assets/')
-    }
+    },
+    plugins: [new TsconfigPathsPlugin()]
   },
   output: {
     publicPath: '/assets',
@@ -164,8 +164,11 @@ const config: WebpackConfiguration = {
           realWindow: "Function('return this')()"
         },
   plugins: [
+    new webpack.DefinePlugin({
+      __VUE_OPTIONS_API__: JSON.stringify(true),
+      __VUE_PROD_DEVTOOLS__: JSON.stringify(false)
+    }),
     new VueLoaderPlugin(),
-    new TsconfigPathsPlugin(),
     new MiniCssExtractPlugin({
       filename: 'visual.css',
       chunkFilename: '[id].css'

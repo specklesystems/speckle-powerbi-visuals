@@ -37,6 +37,7 @@ export default class TooltipHandler {
     }
 
     this.tooltipService.show(tooltipData)
+    if (Object.keys(tooltipData.dataItems).length > 0) this.tooltipService.show(tooltipData)
   }
 
   public hide() {

@@ -20,7 +20,7 @@ function goToGuide() {
     class="flex flex-col justify-center items-center h-full w-full bg-primary text-center text-foundation"
   >
     <div class="flex justify-center items-center">
-      <img src="../../assets/logo-white.png" alt="Logo" class="w-1/3" />
+      <img src="@assets/logo-white.png" alt="Logo" class="w-1/3" />
     </div>
     <p class="heading">Speckle PowerBI 3D Visual</p>
     <div class="flex justify-center mt-2 gap-1">

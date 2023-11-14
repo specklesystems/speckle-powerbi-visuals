@@ -12,14 +12,10 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "types": [],
-    "baseUrl": "./",
+    "baseUrl": ".",
     "paths": {
-      "src/*": [
-        "./src/*"
-      ],
-      "assets/*": [
-        "./assets/*"
-      ]
+      "@src/*": ["src/*"],
+      "@assets/*": ["assets/*"]
     }
   },
   "ts-node": {
@@ -30,7 +26,5 @@
   },
   "files": ["./src/visual.ts"],
   "include": ["./src/**/*.ts", "./src/**/*.vue"],
-  "exclude": [
-    "webpack.config.dev.ts"
-  ]
+  "exclude": ["webpack.config.dev.ts"]
 }

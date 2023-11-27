@@ -203,6 +203,7 @@ export default class ViewerHandler {
   }
 
   public async selectObjects(objectIds: string[] = null) {
+    if (!this.viewer) return
     await this.viewer.resetHighlight()
     const objIds = objectIds ?? []
     this.state = await this.viewer.selectObjects(objIds)

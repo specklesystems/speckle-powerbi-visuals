@@ -76,9 +76,11 @@ export class Visual implements IVisual {
       console.log('❌Input not valid:', (e as Error).message)
       this.host.displayWarningIcon(
         `Incomplete data input.`,
-        `"Stream URL", "Commit Object ID" and "Object ID" data inputs are mandatory. If your data connector does not output all these columns, please update it.`
+        `"Model URL", "Version Object ID" and "Object ID" data inputs are mandatory. If your data connector does not output all these columns, please update it.`
       )
-      console.warn(`Incomplete data input. "Stream URL" and "Object ID" data inputs are mandatory`)
+      console.warn(
+        `Incomplete data input. "Model URL", "Version Object ID" and "Object ID" data inputs are mandatory. If your data connector does not output all these columns, please update it.`
+      )
       store.commit('setStatus', 'incomplete')
       return
     }

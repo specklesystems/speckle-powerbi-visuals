@@ -1,12 +1,12 @@
 {
   "dataRoles": [
     {
-      "displayName": "Stream URL",
+      "displayName": "Model URL",
       "kind": "Grouping",
       "name": "stream"
     },
     {
-      "displayName": "Commit Object ID",
+      "displayName": "Version Object ID",
       "kind": "Grouping",
       "name": "parentObject"
     },

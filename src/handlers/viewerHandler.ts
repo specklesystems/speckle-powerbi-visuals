@@ -1,17 +1,18 @@
 import {
   CanonicalView,
   FilteringState,
-  Viewer,
+  LegacyViewer,
   IntersectionQuery,
   DefaultViewerParams,
   Box3,
-  SpeckleView
+  SpeckleView,
+  CameraController
 } from '@speckle/viewer'
 import { pickViewableHit, projectToScreen } from '../utils/viewerUtils'
 import _ from 'lodash'
 import { SpeckleVisualSettingsModel } from 'src/settings/visualSettingsModel'
 export default class ViewerHandler {
-  private viewer: Viewer
+  private viewer: LegacyViewer
   private readonly parent: HTMLElement
   private state: FilteringState
   private loadedObjectsCache: Set<string> = new Set<string>()
@@ -37,7 +38,8 @@ export default class ViewerHandler {
         break
     }
 
-    this.viewer.cameraHandler.controls.maxPolarAngle = settings.camera.allowCameraUnder.value
+    this.viewer.getExtension(CameraController).controls.maxPolarAngle = settings.camera
+      .allowCameraUnder.value
       ? Math.PI
       : Math.PI / 2
 
@@ -70,7 +72,7 @@ export default class ViewerHandler {
   }
 
   public addCameraUpdateEventListener(listener: (ev) => void) {
-    this.viewer.cameraHandler.controls.addEventListener('update', listener)
+    this.viewer.getExtension(CameraController).controls.addEventListener('update', listener)
   }
 
   public constructor(parent: HTMLElement) {
@@ -82,7 +84,7 @@ export default class ViewerHandler {
     const viewerSettings = DefaultViewerParams
     viewerSettings.showStats = false
     viewerSettings.verbose = false
-    const viewer = new Viewer(this.parent, viewerSettings)
+    const viewer = new LegacyViewer(this.parent, viewerSettings)
     await viewer.init()
     this.viewer = viewer
   }
@@ -210,11 +212,14 @@ export default class ViewerHandler {
   }
 
   public getScreenPosition(worldPosition): { x: number; y: number } {
-    return projectToScreen(this.viewer.cameraHandler.camera, worldPosition)
+    return projectToScreen(
+      this.viewer.getExtension(CameraController).controls.camera,
+      worldPosition
+    )
   }
 
   public dispose() {
-    this.viewer.cameraHandler.controls.removeAllEventListeners()
+    this.viewer.getExtension(CameraController).controls.removeAllEventListeners()
     this.viewer.dispose()
     this.viewer = null
   }

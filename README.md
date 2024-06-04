@@ -1,3 +1,9 @@
+### ⚠️⚠️⚠️ Note: This repository is no longer maintained and has been merged with the [Speckle Power BI](https://github.com/specklesystems/speckle-powerbi) repository. ⚠️⚠️⚠️
+
+The functionalities and features of Speckle Power BI Visuals have been consolidated into the main [Speckle Power BI](https://github.com/specklesystems/speckle-powerbi) repository. Please visit the Speckle Power BI repository for the latest updates, installation instructions, and continued development.
+
+
+
 <h1 align="center">
   <img src="https://user-images.githubusercontent.com/2679513/131189167-18ea5fe1-c578-47f6-9785-3748178e4312.png" width="150px"/><br/>
   Speckle | PowerBI Visuals
@@ -7,7 +13,7 @@
     Expected use case is that the visual displays data pulled from Speckle via the Speckle Data Connector for PowerBI (https://github.com/specklesystems/speckle-powerbi)
 </h3>
 
-> ⚠️ This repo is still in very early stages of development, use at your own risk!
+> This repo is still in very early stages of development, use at your own risk!
 
 <p align="center"><b>Speckle</b> is data infrastructure for the AEC industry.</p><br/>
 

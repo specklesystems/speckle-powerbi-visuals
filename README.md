@@ -1,4 +1,4 @@
-### ⚠️⚠️⚠️ Note: This repository is no longer maintained and has been merged with the [Speckle Power BI](https://github.com/specklesystems/speckle-powerbi) repository. ⚠️⚠️⚠️
+# ⚠️⚠️⚠️ Note: This repository is no longer maintained and has been merged with the [Speckle Power BI](https://github.com/specklesystems/speckle-powerbi) repository. ⚠️⚠️⚠️
 
 The functionalities and features of Speckle Power BI Visuals have been consolidated into the main [Speckle Power BI](https://github.com/specklesystems/speckle-powerbi) repository. Please visit the Speckle Power BI repository for the latest updates, installation instructions, and continued development.
 

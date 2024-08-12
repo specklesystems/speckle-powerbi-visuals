@@ -207,6 +207,8 @@
       "name": "WebAccess",
       "parameters": [
         "https://speckle.xyz",
+        "https://app.speckle.systems",
+        "https://latest.speckle.systems",
         "https://*.speckle.xyz",
         "https://latest.speckle.dev",
         "https://*.speckle.dev",
